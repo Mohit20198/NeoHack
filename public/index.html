@@ -101,15 +101,20 @@
         </div>
       </div>
 
-      <div id="statusBar" class="status-bar hidden">
-        <div class="spinner"></div>
-        <span id="statusText">Loading database...</span>
-      </div>
+        <div id="statusBar" class="status-bar hidden">
+          <div class="spinner"></div>
+          <span id="statusText">Loading database...</span>
+        </div>
 
-      <div id="resultsContainer" class="results-container">
-        <!-- Results will be injected here dynamically -->
-      </div>
-    </div> <!-- END LOOKUP TAB -->
+        <div id="resultsToolbar" class="results-toolbar hidden" style="margin-top: 20px; display: flex; justify-content: space-between; align-items: center; background: var(--card); padding: 10px 15px; border-radius: 8px; border: 1px solid var(--border);">
+          <div id="resultsCount" style="font-weight: 600; color: var(--primary);"></div>
+          <input type="text" id="resultsFilter" placeholder="Search within results..." style="padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); width: 250px;">
+        </div>
+  
+        <div id="resultsContainer" class="results-container">
+          <!-- Results will be injected here dynamically -->
+        </div>
+      </div> <!-- END LOOKUP TAB -->
 
       <!-- FEED TAB -->
       <div id="feedTab" class="tab-content hidden">

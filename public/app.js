@@ -123,6 +123,8 @@ async function doSearch() {
   if (queries.length === 0) return;
 
   hideCards();
+  $id("resultsToolbar").classList.add("hidden");
+  $id("resultsFilter").value = "";
   showStatus("Searching database...");
 
   try {
@@ -154,16 +156,30 @@ async function doSearch() {
 
     // Clear results
     $id("resultsContainer").innerHTML = "";
+    
+    // Separate found vs not found
+    const foundQueries = queries.filter(q => data.results[q] && data.results[q].length > 0);
+    const notFoundQueries = queries.filter(q => !data.results[q] || data.results[q].length === 0);
+    
+    let studentsFoundCount = 0;
 
-    // Render results (data.results[query] is now an array)
-    queries.forEach(query => {
+    // Render found first
+    foundQueries.forEach(query => {
       const records = data.results[query];
-      if (records && records.length > 0) {
-        records.forEach(record => showResult(query, record));
-      } else {
-        showNotFound(query);
-      }
+      studentsFoundCount += records.length;
+      records.forEach(record => showResult(query, record));
     });
+
+    // Render not found last
+    notFoundQueries.forEach(query => {
+      showNotFound(query);
+    });
+
+    // Show toolbar with count if search performed
+    if (queries.length > 0) {
+      $id("resultsCount").textContent = `Found ${studentsFoundCount} student${studentsFoundCount !== 1 ? 's' : ''}`;
+      $id("resultsToolbar").classList.remove("hidden");
+    }
 
   } catch (error) {
     console.error("Search failed:", error);
@@ -351,6 +367,20 @@ $id("clearBtn").addEventListener("click", () => {
   $id("neoIdInput").focus();
   hideCards();
   hideStatus();
+  $id("resultsToolbar").classList.add("hidden");
+});
+
+$id("resultsFilter").addEventListener("input", (e) => {
+  const filterText = e.target.value.toLowerCase();
+  const cards = document.querySelectorAll("#resultsContainer .result-card");
+  
+  cards.forEach(card => {
+    if (card.innerText.toLowerCase().includes(filterText)) {
+      card.style.display = "";
+    } else {
+      card.style.display = "none";
+    }
+  });
 });
 
 const style = document.createElement("style");
