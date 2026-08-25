@@ -126,43 +126,68 @@ function splitCSVLine(line) {
 }
 
 function loadDatabase() {
-  try {
-    const csvPath = path.join(__dirname, 'Bain shortlist.xlsx - Sheet2.csv');
-    const csvData = fs.readFileSync(csvPath, 'utf8');
-    
-    const lines = csvData.split(/\r?\n/).filter(l => l.trim());
-    for (let i = 1; i < lines.length; i++) {
-      const cols = splitCSVLine(lines[i]);
-      if (cols.length < 5) continue;
+    try {
+      const csvPath = path.join(__dirname, 'Bain shortlist.xlsx - Sheet2.csv');
+      const csvData = fs.readFileSync(csvPath, 'utf8');
       
-      const email = cols[0].trim();
-      const name = cols[1].trim();
-      const regNo = cols[2].trim();
-      const neoId = cols[3].trim().toUpperCase();
-      const offEmail = cols[4].trim();
-      
-      if (!neoId) continue;
-      
-      const record = { name, regNo, email, offEmail, neoId };
-      database[neoId] = record;
-      
-      if (regNo && regNo !== "-") {
-        regDatabase[regNo.toUpperCase()] = record;
-      }
+      let isFormat2 = false;
+      const lines = csvData.split(/\r?\n/).filter(l => l.trim());
+      for (let i = 0; i < lines.length; i++) {
+        const cols = splitCSVLine(lines[i]);
 
-      // Populate name database for reverse-lookup by name
-      const lowerName = name.toLowerCase();
-      if (!nameDatabase[lowerName]) {
-        nameDatabase[lowerName] = [];
+        // Detect transition to the new format
+        if (cols[0] && cols[0].trim().toLowerCase() === 'username' && cols[1] && cols[1].trim().toLowerCase() === 'name') {
+          isFormat2 = true;
+          continue;
+        }
+
+        if (cols.length < 4) continue;
+        
+        let email = "", name = "", regNo = "", neoId = "", offEmail = "";
+        let tenth = null, twelfth = null, cgpa = null;
+
+        if (!isFormat2) {
+          email = cols[0] ? cols[0].trim() : "";
+          name = cols[1] ? cols[1].trim() : "";
+          regNo = cols[2] ? cols[2].trim() : "";
+          neoId = cols[3] ? cols[3].trim().toUpperCase() : "";
+          offEmail = cols[4] ? cols[4].trim() : "";
+        } else {
+          // Format 2: Username,Name,Neo ID,Reg No,10th marks,Type 1,CGPA,Type 2,12th marks,Type 3
+          email = cols[0] ? cols[0].trim() : "";
+          name = cols[1] ? cols[1].trim() : "";
+          neoId = cols[2] ? cols[2].trim().toUpperCase() : "";
+          regNo = cols[3] ? cols[3].trim() : "";
+          tenth = (cols[4] && cols[4].trim() !== '-') ? cols[4].trim() : null;
+          cgpa = (cols[6] && cols[6].trim() !== '-') ? cols[6].trim() : null;
+          twelfth = (cols[8] && cols[8].trim() !== '-') ? cols[8].trim() : null;
+        }
+        
+        if (!neoId || neoId === '-') continue;
+        
+        const record = { name, regNo, email, offEmail, neoId, tenth, twelfth, cgpa };
+        
+        // If the record already exists, merge the new fields instead of completely overwriting
+        if (database[neoId]) {
+          if (tenth) database[neoId].tenth = tenth;
+          if (twelfth) database[neoId].twelfth = twelfth;
+          if (cgpa) database[neoId].cgpa = cgpa;
+        } else {
+          database[neoId] = record;
+        }
+        
+        if (regNo && regNo !== '-') regDatabase[regNo.toUpperCase()] = database[neoId];
+        
+        const lowerName = name.toLowerCase();
+        if (!nameDatabase[lowerName]) nameDatabase[lowerName] = [];
+        nameDatabase[lowerName].push(database[neoId]);
       }
-      nameDatabase[lowerName].push(record);
+      
+      totalStudents = Object.keys(database).length;
+      console.log(`Successfully loaded ${totalStudents} students into memory.`);
+    } catch (err) {
+      console.error("Failed to load database. Make sure the CSV file exists.", err);
     }
-    
-    totalStudents = Object.keys(database).length;
-    console.log(`Successfully loaded ${totalStudents} students into memory.`);
-  } catch (err) {
-    console.error("Failed to load database. Make sure the CSV file exists.", err);
-  }
 }
 
 // Load DB on startup

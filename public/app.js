@@ -124,7 +124,7 @@ async function doSearch() {
 
   hideCards();
   $id("resultsToolbar").classList.add("hidden");
-  $id("resultsFilter").value = "";
+  if($id("resultsFilter")) $id("resultsFilter").value = "";
   showStatus("Searching database...");
 
   try {
@@ -176,7 +176,7 @@ async function doSearch() {
     });
 
     // Show toolbar with count if search performed
-    if (queries.length > 0) {
+    if (queries.length > 0 && $id("resultsCount") && $id("resultsToolbar")) {
       $id("resultsCount").textContent = `Found ${studentsFoundCount} student${studentsFoundCount !== 1 ? 's' : ''}`;
       $id("resultsToolbar").classList.remove("hidden");
     }
@@ -209,11 +209,29 @@ function showResult(query, r) {
           <div class="field-label">Personal Email</div>
           <div class="field-value">${r.email}</div>
         </div>
-        <div class="result-field full-width">
-          <div class="field-label">Official College Email</div>
-          <div class="field-value">${r.offEmail}</div>
+          <div class="result-field full-width">
+            <div class="field-label">Official College Email</div>
+            <div class="field-value">${r.offEmail}</div>
+          </div>
+          ${r.cgpa ? `
+          <div class="result-field">
+            <div class="field-label">CGPA</div>
+            <div class="field-value">${r.cgpa}</div>
+          </div>
+          ` : ''}
+          ${r.tenth ? `
+          <div class="result-field">
+            <div class="field-label">10th Marks</div>
+            <div class="field-value">${r.tenth}${r.tenth !== '-' && !r.tenth.includes('%') ? '%' : ''}</div>
+          </div>
+          ` : ''}
+          ${r.twelfth ? `
+          <div class="result-field">
+            <div class="field-label">12th Marks</div>
+            <div class="field-value">${r.twelfth}${r.twelfth !== '-' && !r.twelfth.includes('%') ? '%' : ''}</div>
+          </div>
+          ` : ''}
         </div>
-      </div>
     </div>
   `;
   $id("resultsContainer").insertAdjacentHTML("beforeend", html);
@@ -367,21 +385,23 @@ $id("clearBtn").addEventListener("click", () => {
   $id("neoIdInput").focus();
   hideCards();
   hideStatus();
-  $id("resultsToolbar").classList.add("hidden");
+  if($id("resultsToolbar")) $id("resultsToolbar").classList.add("hidden");
 });
 
-$id("resultsFilter").addEventListener("input", (e) => {
-  const filterText = e.target.value.toLowerCase();
-  const cards = document.querySelectorAll("#resultsContainer .result-card");
-  
-  cards.forEach(card => {
-    if (card.innerText.toLowerCase().includes(filterText)) {
-      card.style.display = "";
-    } else {
-      card.style.display = "none";
-    }
+if($id("resultsFilter")) {
+  $id("resultsFilter").addEventListener("input", (e) => {
+    const filterText = e.target.value.toLowerCase();
+    const cards = document.querySelectorAll("#resultsContainer .result-card");
+    
+    cards.forEach(card => {
+      if (card.innerText.toLowerCase().includes(filterText)) {
+        card.style.display = "";
+      } else {
+        card.style.display = "none";
+      }
+    });
   });
-});
+}
 
 const style = document.createElement("style");
 style.textContent = `@keyframes shake {0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)}} .shake{animation:shake 0.35s ease;}`;
