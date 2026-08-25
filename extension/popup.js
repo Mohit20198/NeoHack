@@ -27,7 +27,7 @@ document.getElementById('trackBtn').addEventListener('click', async () => {
     statusEl.textContent = `Found ${data.possibleIds.length} potential IDs. Sending to server...`;
 
     // Send data to backend
-    const response = await fetch('http://localhost:3000/api/add-placement', {
+    const response = await fetch('https://neohack.onrender.com/api/add-placement', {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
