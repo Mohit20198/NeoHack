@@ -541,6 +541,7 @@ app.post('/api/add-placement', async (req, res) => {
         }
       }
     }
+  }
 
     res.json({ 
       success: true, 
