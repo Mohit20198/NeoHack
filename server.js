@@ -477,6 +477,8 @@ app.post('/api/add-placement', async (req, res) => {
 
   try {
     let finalCompanyName = companyName;
+    let addedStudents = [];
+    let trackedStudents = [];
 
   // Auto-map if the email subject contains a tracked company's name
   const existingCompanies = await Company.find().lean();
