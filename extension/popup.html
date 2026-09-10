@@ -25,7 +25,13 @@
   <h2>NeoHack Tracker</h2>
   <div style="display: flex; flex-direction: column; gap: 10px;">
     <button id="trackAnnouncementBtn" class="btn" style="background: #10b981;">Track Announcement</button>
-    <button id="trackPlacementBtn" class="btn">Track Placements</button>
+    <div style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px;">
+      <label style="display: block; margin-bottom: 5px; font-size: 12px; color: var(--text-muted);">Map Placements to Company:</label>
+      <select id="companySelect" style="width: 100%; padding: 8px; border-radius: 6px; background: var(--bg-dark); color: var(--text); border: 1px solid var(--border); margin-bottom: 10px;">
+        <option value="">Auto-detect from email subject</option>
+      </select>
+      <button id="trackPlacementBtn" class="btn">Track Placements</button>
+    </div>
     <button id="trackBulkBtn" class="btn" style="background: #6366f1;">Track All Visible Inbox Announcements</button>
     <button id="trackNeopatBtn" class="btn" style="background: #ec4899;">Track Neopat Grid</button>
   </div>

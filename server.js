@@ -224,6 +224,15 @@ app.post('/api/lookup', requireAuth, (req, res) => {
   res.json({ results, totalStudents });
 });
 
+app.get('/api/companies', async (req, res) => {
+  try {
+    const companies = await Company.find().sort({ name: 1 }).lean();
+    res.json(companies);
+  } catch (err) {
+    res.status(500).json({ error: 'Server error fetching companies' });
+  }
+});
+
 // API endpoint for comprehensive branch stats
 app.get('/api/stats', async (req, res) => {
   const placements = await Placement.find().sort({ timestamp: -1 }).lean();

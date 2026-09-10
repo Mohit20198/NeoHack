@@ -1,4 +1,23 @@
-async function executeExtraction(endpoint, isAnnouncement) {
+// Fetch companies on load
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    const res = await fetch('https://neohack.onrender.com/api/companies');
+    if (res.ok) {
+      const companies = await res.json();
+      const select = document.getElementById('companySelect');
+      companies.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.name;
+        opt.textContent = `${c.name} (${c.packageCTC || 'Undisclosed'})`;
+        select.appendChild(opt);
+      });
+    }
+  } catch (err) {
+    console.error("Failed to load companies dropdown", err);
+  }
+});
+
+async function executeExtraction(endpoint, isAnnouncement, overrideCompanyName = null) {
   const statusEl = document.getElementById('status');
   statusEl.textContent = 'Extracting...';
   
@@ -20,6 +39,10 @@ async function executeExtraction(endpoint, isAnnouncement) {
     if (!isAnnouncement && (!data.possibleIds || data.possibleIds.length === 0)) {
       statusEl.textContent = "No potential IDs found in this email.";
       return;
+    }
+
+    if (overrideCompanyName && overrideCompanyName.trim() !== "") {
+      data.companyName = overrideCompanyName;
     }
 
     if (isAnnouncement) {
@@ -55,7 +78,8 @@ document.getElementById('trackAnnouncementBtn').addEventListener('click', () => 
 });
 
 document.getElementById('trackPlacementBtn').addEventListener('click', () => {
-  executeExtraction('/api/add-placement', false);
+  const selectedCompany = document.getElementById('companySelect').value;
+  executeExtraction('/api/add-placement', false, selectedCompany);
 });
 
 document.getElementById('trackBulkBtn').addEventListener('click', async () => {
