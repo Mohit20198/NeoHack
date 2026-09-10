@@ -473,7 +473,8 @@ app.post('/api/add-placement', async (req, res) => {
     return res.status(400).json({ error: 'Missing possible IDs' });
   }
 
-  let finalCompanyName = companyName;
+  try {
+    let finalCompanyName = companyName;
 
   // Auto-map if the email subject contains a tracked company's name
   const existingCompanies = await Company.find().lean();
@@ -531,20 +532,18 @@ app.post('/api/add-placement', async (req, res) => {
             } else {
               trackedStudents.push(foundRecord.name);
             }
-          } else {
-            console.log(`[WARNING] Skipped ${nameKey} because multiple students share this exact name.`);
           }
         }
       }
     }
-  }
 
-  if (addedStudents.length > 0) {
-    res.json({ success: true, message: `Added ${addedStudents.length} student(s)` });
-  } else if (trackedStudents.length > 0) {
-    res.json({ success: true, message: `Already tracked ${trackedStudents.length} student(s)` });
-  } else {
-    res.status(404).json({ error: 'Student not found in database' });
+    res.json({ 
+      success: true, 
+      message: `Tracked ${addedStudents.length} new placements for ${finalCompanyName}. Found ${trackedStudents.length} total.` 
+    });
+  } catch (error) {
+    console.error("Error in /api/add-placement:", error);
+    res.status(500).json({ success: false, error: 'Internal server error while tracking placements' });
   }
 });
 
