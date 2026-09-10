@@ -40,10 +40,16 @@
         
         // Find package using the full text to avoid newline split issues
         const fullText = card.innerText.replace(/\n/g, ' ');
-        const match = fullText.match(/(?:₹)?\s*([\d.]+(?:L|LPA|K|PM)?(?:\s*-\s*[\d.]+(?:L|LPA|K|PM)?)?)\s*(?:PA|LPA|PM)/i);
+        // Try matching with ₹ symbol first
+        let match = fullText.match(/₹\s*([\d.]+(?:L|K|LPA)?(?:\s*-\s*[\d.]+(?:L|K|LPA)?)?)\s*(?:PA|LPA|PM)/i);
+        // If no ₹, require an L or K to prevent matching time formats (e.g., 04:00 PM)
+        if (!match) {
+          match = fullText.match(/([\d.]+(?:L|K)(?:\s*-\s*[\d.]+(?:L|K)?)?)\s*(?:PA|LPA|PM)/i);
+        }
+        
         if (match) {
           let pkg = match[1].trim().toUpperCase();
-          if (fullText.toUpperCase().includes('PM') && !pkg.includes('PM')) {
+          if (fullText.substring(match.index).toUpperCase().includes('PM') && !pkg.includes('PM')) {
             pkg = pkg.replace('L', 'L PM');
             if (!pkg.includes('PM')) pkg += ' PM';
           } else {
