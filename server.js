@@ -13,6 +13,7 @@ const JWT_SECRET = 'neohack-super-secret-key-2026';
 const client = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 const Placement = require('./models/Placement');
+const Company = require('./models/Company');
 
 mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/neohack")
   .then(() => console.log("Connected to MongoDB!"))
@@ -253,21 +254,67 @@ app.get('/api/stats', requireAuth, async (req, res) => {
       }
     });
 
+  // Calculate Student-based CTC Math for VIT Bhopal
+  let numericPackages = [];
+  let highestPackage = 0;
+
   // Calculate Company Stats
+  const companiesFromDB = await Company.find().lean();
   const companyStats = {};
+  
+  // Pre-fill companies from DB
+  companiesFromDB.forEach(c => {
+    companyStats[c.name] = { 
+      totalPlaced: c.totalVitPlaced, 
+      vitBhopalPlaced: 0, 
+      packageCTC: c.packageCTC || 'Undisclosed' 
+    };
+  });
+
   placements.forEach(p => {
     const comp = p.source || "Unknown";
     if (!companyStats[comp]) {
       companyStats[comp] = { totalPlaced: 0, vitBhopalPlaced: 0, packageCTC: p.packageCTC || 'Undisclosed' };
     }
-    companyStats[comp].totalPlaced += 1;
     
     // Check if VIT Bhopal
     const student = database[p.neoId];
     if (student && student.offEmail && student.offEmail.toLowerCase().includes('vitbhopal.ac.in')) {
       companyStats[comp].vitBhopalPlaced += 1;
+      
+      // Attempt to parse package for Bhopal math
+      let numericVal = 0;
+      if (p.packageCTC) {
+        const match = p.packageCTC.match(/[\d.]+/);
+        if (match) {
+          numericVal = parseFloat(match[0]);
+        }
+      } else {
+        // Fallback to company DB if exist
+        const dbComp = companiesFromDB.find(c => c.name === comp);
+        if (dbComp && dbComp.numericPackage > 0) numericVal = dbComp.numericPackage;
+      }
+
+      if (numericVal > 0) {
+        numericPackages.push(numericVal);
+        if (numericVal > highestPackage) highestPackage = numericVal;
+      }
     }
   });
+  
+  // Average and Median
+  let avgPackage = 0;
+  let medianPackage = 0;
+  if (numericPackages.length > 0) {
+    numericPackages.sort((a, b) => a - b);
+    const sum = numericPackages.reduce((acc, val) => acc + val, 0);
+    avgPackage = (sum / numericPackages.length).toFixed(2);
+    
+    const mid = Math.floor(numericPackages.length / 2);
+    medianPackage = numericPackages.length % 2 !== 0 
+        ? numericPackages[mid] 
+        : ((numericPackages[mid - 1] + numericPackages[mid]) / 2).toFixed(2);
+  }
 
   // Calculate CGPA Stats
   const cgpaStats = {
@@ -304,7 +351,12 @@ app.get('/api/stats', requireAuth, async (req, res) => {
     totalPlaced: placedNeoIds.size,
     branchStats,
     companyStats,
-    cgpaStats
+    cgpaStats,
+    ctcStats: {
+      avg: avgPackage,
+      median: medianPackage,
+      highest: highestPackage
+    }
   });
 });
 
@@ -329,6 +381,34 @@ app.get('/api/recent', requireAuth, async (req, res) => {
 
 const NEOHACK_API_KEY = "admin_secret_9942";
 
+app.post('/api/add-company', async (req, res) => {
+  const apiKey = req.headers['x-api-key'];
+  if (apiKey !== NEOHACK_API_KEY) {
+    return res.status(401).json({ success: false, error: 'Unauthorized Extension' });
+  }
+  const { companyName, packageCTC } = req.body;
+  if (!companyName) {
+    return res.status(400).json({ error: 'Missing companyName' });
+  }
+
+  try {
+    let numericPackage = 0;
+    if (packageCTC) {
+      const match = packageCTC.match(/[\d.]+/);
+      if (match) numericPackage = parseFloat(match[0]);
+    }
+    
+    await Company.findOneAndUpdate(
+      { name: companyName },
+      { packageCTC: packageCTC || 'Undisclosed', numericPackage },
+      { upsert: true, new: true }
+    );
+    res.json({ success: true, message: `Company ${companyName} tracked!` });
+  } catch(err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // API endpoint for Chrome Extension to add a placement
 app.post('/api/add-placement', async (req, res) => {
   const apiKey = req.headers['x-api-key'];
@@ -344,6 +424,13 @@ app.post('/api/add-placement', async (req, res) => {
   let addedStudents = [];
   let trackedStudents = [];
   
+  // Track Total VIT Placements in Company
+  await Company.findOneAndUpdate(
+    { name: companyName },
+    { $set: { totalVitPlaced: possibleIds.length } },
+    { upsert: true }
+  );
+
   // 1. Check by explicit IDs (Neo ID or Reg No)
   for (let id of possibleIds) {
     const query = id.toUpperCase();

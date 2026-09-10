@@ -83,25 +83,25 @@ async function loadBranchStats() {
 }
 
 // ── Tab Switching ──────────────────────────────
-document.querySelectorAll('.tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    // Remove active class from all buttons and content
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
-    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-    
-    // Add active class to clicked button and target content
-    btn.classList.add('active');
-    const targetId = btn.getAttribute('data-target');
-    $id(targetId).classList.remove('hidden');
-    $id(targetId).classList.add('active');
-    
-    // Load stats if stats tab is opened
-    if (targetId === 'statsTab') {
-      loadBranchStats();
-    }
+  document.querySelectorAll(".tab-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      // Deactivate all
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll(".tab-content").forEach(c => c.classList.add("hidden"));
+      
+      // Activate clicked
+      btn.classList.add("active");
+      const targetId = btn.getAttribute("data-tab") || btn.getAttribute("data-target");
+      if ($id(targetId)) {
+        $id(targetId).classList.remove("hidden");
+      }
+      
+      // Load feed/stats if those tabs are clicked
+      if (targetId === "feedTab" || targetId === "statsTab" || targetId === "companiesTab") {
+        loadRecentPlacements();
+      }
+    });
   });
-});
 
 // Initialization
 loadRecentPlacements();
@@ -263,6 +263,13 @@ async function loadRecentPlacements() {
     // Update Total Placed
     $id("statPlaced").textContent = statsData.totalPlaced || 0;
 
+    // Render CTC Math
+    if (statsData.ctcStats) {
+      $id("statAvgPackage").textContent = statsData.ctcStats.avg > 0 ? `${statsData.ctcStats.avg} LPA` : '--';
+      $id("statMedianPackage").textContent = statsData.ctcStats.median > 0 ? `${statsData.ctcStats.median} LPA` : '--';
+      $id("statHighestPackage").textContent = statsData.ctcStats.highest > 0 ? `${statsData.ctcStats.highest} LPA` : '--';
+    }
+
     // Render Company Stats
     if (statsData.companyStats && Object.keys(statsData.companyStats).length > 0) {
       $id("companyStatsSection").classList.remove("hidden");
@@ -279,7 +286,7 @@ async function loadRecentPlacements() {
             <td style="padding: 15px; border-bottom: 1px solid var(--border);"><strong>${comp}</strong></td>
             <td style="padding: 15px; border-bottom: 1px solid var(--border);"><span class="badge badge-package">${stats.packageCTC || 'Undisclosed'}</span></td>
             <td style="padding: 15px; border-bottom: 1px solid var(--border);">${stats.totalPlaced}</td>
-            <td style="padding: 15px; border-bottom: 1px solid var(--border);">${stats.vitBhopalPlaced} <span style="color:var(--text-muted);font-size:0.85em;">(${(stats.vitBhopalPlaced/stats.totalPlaced*100).toFixed(0)}%)</span></td>
+            <td style="padding: 15px; border-bottom: 1px solid var(--border);">${stats.vitBhopalPlaced} <span style="color:var(--text-muted);font-size:0.85em;">(${(stats.vitBhopalPlaced/Math.max(1, stats.totalPlaced)*100).toFixed(0)}%)</span></td>
           </tr>
         `;
       });

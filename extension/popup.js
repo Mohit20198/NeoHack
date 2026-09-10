@@ -1,9 +1,8 @@
-document.getElementById('trackBtn').addEventListener('click', async () => {
+async function executeExtraction(endpoint, isAnnouncement) {
   const statusEl = document.getElementById('status');
   statusEl.textContent = 'Extracting...';
   
   try {
-    // Get current active tab
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     
     if (!tab.url.includes("mail.google.com")) {
@@ -11,7 +10,6 @@ document.getElementById('trackBtn').addEventListener('click', async () => {
       return;
     }
 
-    // Execute content script in the active tab
     const results = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
       files: ['content.js']
@@ -19,15 +17,18 @@ document.getElementById('trackBtn').addEventListener('click', async () => {
 
     const data = results[0].result;
     
-    if (!data.possibleIds || data.possibleIds.length === 0) {
+    if (!isAnnouncement && (!data.possibleIds || data.possibleIds.length === 0)) {
       statusEl.textContent = "No potential IDs found in this email.";
       return;
     }
 
-    statusEl.textContent = `Found ${data.possibleIds.length} potential IDs. Sending to server...`;
+    if (isAnnouncement) {
+      statusEl.textContent = `Found company: ${data.companyName}. Sending...`;
+    } else {
+      statusEl.textContent = `Found ${data.possibleIds.length} potential IDs. Sending...`;
+    }
 
-    // Send data to backend
-    const response = await fetch('https://neohack.onrender.com/api/add-placement', {
+    const response = await fetch(`https://neohack.onrender.com${endpoint}`, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
@@ -47,4 +48,12 @@ document.getElementById('trackBtn').addEventListener('click', async () => {
   } catch (error) {
     statusEl.textContent = "Error occurred: " + error.message;
   }
+}
+
+document.getElementById('trackAnnouncementBtn').addEventListener('click', () => {
+  executeExtraction('/api/add-company', true);
+});
+
+document.getElementById('trackPlacementBtn').addEventListener('click', () => {
+  executeExtraction('/api/add-placement', false);
 });

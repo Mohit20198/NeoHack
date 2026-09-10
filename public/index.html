@@ -41,11 +41,12 @@
       </div>
     </header>
 
-    <div class="nav-tabs" style="display:flex; gap:15px; justify-content:center; margin-bottom: 20px;">
-      <button class="tab-btn active" data-target="lookupTab">Lookup</button>
-      <button class="tab-btn" data-target="feedTab">Recent Placements</button>
-      <button class="tab-btn" data-target="statsTab">Detailed Analytics</button>
-    </div>
+      <nav class="tabs" style="display:flex; gap:15px; justify-content:center; margin-bottom: 20px;">
+        <button class="tab-btn active" data-tab="lookupTab">Lookup</button>
+        <button class="tab-btn" data-tab="feedTab">Feed</button>
+        <button class="tab-btn" data-tab="companiesTab">Companies</button>
+        <button class="tab-btn" data-tab="statsTab">Analytics</button>
+      </nav>
 
   <main class="container">
     
@@ -131,36 +132,54 @@
         </div>
       </div> <!-- END FEED TAB -->
 
+      <!-- COMPANIES TAB -->
+      <div id="companiesTab" class="tab-content hidden">
+        <div class="stats-header" style="margin-bottom: 20px;">
+          <h2>Company Directory</h2>
+          <p>Companies that have visited for placements and their packages.</p>
+        </div>
+
+        <div class="stats-bar" style="margin-bottom: 30px;" id="ctcStatsBar">
+          <div class="stat-item">
+            <div class="stat-num" id="statAvgPackage">--</div>
+            <div class="stat-label">Average Package</div>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="stat-item">
+            <div class="stat-num" id="statMedianPackage">--</div>
+            <div class="stat-label">Median Package</div>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="stat-item">
+            <div class="stat-num" id="statHighestPackage">--</div>
+            <div class="stat-label">Highest Package</div>
+          </div>
+        </div>
+
+        <div id="companyStatsSection" class="company-stats-section hidden" style="margin-bottom: 40px;">
+          <div class="table-container" style="max-width: 900px; margin: 0 auto; overflow-x: auto; background: var(--card); border-radius: 12px; border: 1px solid var(--border);">
+            <table style="width: 100%; border-collapse: collapse; text-align: left;">
+              <thead>
+                <tr style="border-bottom: 1px solid var(--border); background: rgba(0, 0, 0, 0.2);">
+                  <th style="padding: 15px; color: var(--text-muted); font-weight: 500;">Company</th>
+                  <th style="padding: 15px; color: var(--text-muted); font-weight: 500;">Package (CTC)</th>
+                  <th style="padding: 15px; color: var(--text-muted); font-weight: 500;">Total Placed</th>
+                  <th style="padding: 15px; color: var(--text-muted); font-weight: 500;">VIT Bhopal</th>
+                </tr>
+              </thead>
+              <tbody id="companyStatsList">
+                <!-- Injected dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div> <!-- END COMPANIES TAB -->
+
     <!-- STATS TAB -->
     <div id="statsTab" class="tab-content hidden">
       <div class="stats-header">
         <h2>Branch-Wise Placement Analytics</h2>
         <p>A comprehensive breakdown of placement statistics across all branches.</p>
-      </div>
-
-      <!-- Company Stats -->
-      <div id="companyStatsSection" class="company-stats-section hidden" style="margin-bottom: 40px;">
-        <div class="recent-header" style="justify-content: center; margin-bottom: 20px;">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 20v-6M6 20V10M18 20V4"></path>
-          </svg>
-          <h3>Company Placement Breakdown</h3>
-        </div>
-        <div class="table-container" style="max-width: 900px; margin: 0 auto; overflow-x: auto; background: var(--card); border-radius: 12px; border: 1px solid var(--border);">
-          <table style="width: 100%; border-collapse: collapse; text-align: left;">
-            <thead>
-              <tr style="border-bottom: 1px solid var(--border); background: rgba(0, 0, 0, 0.2);">
-                <th style="padding: 15px; color: var(--text-muted); font-weight: 500;">Company</th>
-                <th style="padding: 15px; color: var(--text-muted); font-weight: 500;">Package (CTC)</th>
-                <th style="padding: 15px; color: var(--text-muted); font-weight: 500;">Total Placed</th>
-                <th style="padding: 15px; color: var(--text-muted); font-weight: 500;">VIT Bhopal</th>
-              </tr>
-            </thead>
-            <tbody id="companyStatsList">
-              <!-- Injected dynamically -->
-            </tbody>
-          </table>
-        </div>
       </div>
 
       <!-- CGPA Stats -->
