@@ -16,7 +16,7 @@
       let card = el.parentElement;
       for (let i = 0; i < 5; i++) {
         if (!card) break;
-        if (card.textContent.includes('PA') || card.textContent.includes('LPA')) {
+        if (card.textContent.includes('PA') || card.textContent.includes('LPA') || card.textContent.includes('PM')) {
           break;
         }
         card = card.parentElement;
@@ -30,16 +30,20 @@
 
         for (let i = 0; i < textLines.length; i++) {
           const line = textLines[i];
-          if (line === "APPLIED" || line === "NOT APPLIED" || line === "SHORTLISTED") {
+          const statusMatch = ["APPLIED", "NOT APPLIED", "SHORTLISTED", "NOT ELIGIBLE"].includes(line.toUpperCase());
+          if (statusMatch) {
             if (i + 1 < textLines.length) {
               companyName = textLines[i + 1];
             }
           }
           
-          if (line.includes('PA') || line.includes('LPA')) {
-            const match = line.match(/(?:₹)?\s*([\d.]+(?:L|LPA|K)?(?:\s*-\s*[\d.]+(?:L|LPA|K)?)?)/i);
+          if (line.includes('PA') || line.includes('LPA') || line.includes('PM')) {
+            const match = line.match(/(?:₹)?\s*([\d.]+(?:L|LPA|K|PM)?(?:\s*-\s*[\d.]+(?:L|LPA|K|PM)?)?)/i);
             if (match) {
-              packageCTC = match[1].trim().toUpperCase().replace('L', ' LPA');
+              let pkg = match[1].trim().toUpperCase();
+              if (line.includes('PM')) pkg = pkg.replace('L', 'L PM');
+              else pkg = pkg.replace('L', ' LPA');
+              packageCTC = pkg;
             } else {
               packageCTC = line.replace('PA', 'LPA').replace('₹', '').trim();
             }
