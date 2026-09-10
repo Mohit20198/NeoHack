@@ -105,3 +105,51 @@ document.getElementById('trackBulkBtn').addEventListener('click', async () => {
     statusEl.textContent = "Error occurred: " + error.message;
   }
 });
+
+document.getElementById('trackNeopatBtn').addEventListener('click', async () => {
+  const statusEl = document.getElementById('status');
+  statusEl.textContent = 'Scanning Neopat Grid...';
+  
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    
+    if (!tab.url.includes("neopat")) {
+      statusEl.textContent = "Please open the Neopat website first!";
+      return;
+    }
+
+    const results = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ['content_neopat.js']
+    });
+
+    const data = results[0].result;
+    
+    if (!data || data.length === 0) {
+      statusEl.textContent = "No companies found on this Neopat page.";
+      return;
+    }
+
+    statusEl.textContent = `Found ${data.length} companies. Sending...`;
+
+    const response = await fetch(`https://neohack.onrender.com/api/add-companies-bulk`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-api-key': 'admin_secret_9942'
+      },
+      body: JSON.stringify({ companies: data })
+    });
+
+    const resultData = await response.json();
+    
+    if (resultData.success) {
+      statusEl.textContent = `Success: ${resultData.message}`;
+    } else {
+      statusEl.textContent = `Error: ${resultData.error}`;
+    }
+
+  } catch (error) {
+    statusEl.textContent = "Error occurred: " + error.message;
+  }
+});
