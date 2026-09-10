@@ -267,6 +267,10 @@ async function loadRecentPlacements() {
     // Update Total Placed
     $id("statPlaced").textContent = statsData.totalPlaced || 0;
 
+    if (statsData.companyStats) {
+      $id("statTotalCompanies").textContent = Object.keys(statsData.companyStats).length;
+    }
+
     // Render CTC Math
     if (statsData.ctcStats) {
       $id("statAvgPackage").textContent = statsData.ctcStats.avg > 0 ? `${statsData.ctcStats.avg} LPA` : '--';

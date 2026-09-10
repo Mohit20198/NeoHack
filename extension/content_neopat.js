@@ -36,18 +36,21 @@
               companyName = textLines[i + 1];
             }
           }
-          
-          if (line.includes('PA') || line.includes('LPA') || line.includes('PM')) {
-            const match = line.match(/(?:₹)?\s*([\d.]+(?:L|LPA|K|PM)?(?:\s*-\s*[\d.]+(?:L|LPA|K|PM)?)?)/i);
-            if (match) {
-              let pkg = match[1].trim().toUpperCase();
-              if (line.includes('PM')) pkg = pkg.replace('L', 'L PM');
-              else pkg = pkg.replace('L', ' LPA');
-              packageCTC = pkg;
-            } else {
-              packageCTC = line.replace('PA', 'LPA').replace('₹', '').trim();
-            }
+        }
+        
+        // Find package using the full text to avoid newline split issues
+        const fullText = card.innerText.replace(/\n/g, ' ');
+        const match = fullText.match(/(?:₹)?\s*([\d.]+(?:L|LPA|K|PM)?(?:\s*-\s*[\d.]+(?:L|LPA|K|PM)?)?)\s*(?:PA|LPA|PM)/i);
+        if (match) {
+          let pkg = match[1].trim().toUpperCase();
+          if (fullText.toUpperCase().includes('PM') && !pkg.includes('PM')) {
+            pkg = pkg.replace('L', 'L PM');
+            if (!pkg.includes('PM')) pkg += ' PM';
+          } else {
+            pkg = pkg.replace('L', ' LPA');
+            if (!pkg.includes('LPA')) pkg += ' LPA';
           }
+          packageCTC = pkg;
         }
 
         if (companyName !== "Unknown" && !seen.has(companyName)) {
