@@ -288,10 +288,10 @@ async function loadRecentPlacements() {
         .sort((a, b) => b[1].totalPlaced - a[1].totalPlaced);
 
       let companyHtml = '';
-      sortedCompanies.forEach(([comp, stats]) => {
+      sortedCompanies.forEach(([comp, stats], index) => {
         companyHtml += `
           <tr class="company-row">
-            <td style="padding: 15px; border-bottom: 1px solid var(--border);"><strong>${comp}</strong></td>
+            <td style="padding: 15px; border-bottom: 1px solid var(--border);"><strong>${index + 1}. ${comp}</strong></td>
             <td style="padding: 15px; border-bottom: 1px solid var(--border);"><span class="badge badge-package">${stats.packageCTC || 'Undisclosed'}</span></td>
             <td style="padding: 15px; border-bottom: 1px solid var(--border);">${stats.totalPlaced}</td>
             <td style="padding: 15px; border-bottom: 1px solid var(--border);">${stats.vitBhopalPlaced} <span style="color:var(--text-muted);font-size:0.85em;">(${(stats.vitBhopalPlaced/Math.max(1, stats.totalPlaced)*100).toFixed(0)}%)</span></td>
