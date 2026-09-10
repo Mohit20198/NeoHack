@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
   <div class="bg-blob blob-1"></div>
@@ -75,6 +76,10 @@
               <line x1="5" y1="12" x2="19" y2="12"/>
               <polyline points="12 5 19 12 12 19"/>
             </svg>
+          </button>
+          <button id="syncGmailBtn" class="search-btn" style="background: #10b981; margin-left: 10px; flex: none;">
+            <svg style="width:16px;height:16px;margin-right:6px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+            Sync Gmail
           </button>
         </div>
         <div class="search-hint">You can search for multiple items at once. Just separate them with spaces, commas, or new lines.</div>
@@ -169,7 +174,8 @@
                   <th style="padding: 15px; color: var(--text-muted); font-weight: 500;">Company</th>
                   <th style="padding: 15px; color: var(--text-muted); font-weight: 500;">Package (CTC)</th>
                   <th style="padding: 15px; color: var(--text-muted); font-weight: 500;">Total Placed</th>
-                  <th style="padding: 15px; color: var(--text-muted); font-weight: 500;">VIT Bhopal</th>
+                  <th style="padding: 15px; text-align: left; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border);">VIT Bhopal</th>
+                  <th style="padding: 15px; text-align: left; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border);">Hiring Status</th>
                 </tr>
               </thead>
               <tbody id="companyStatsList">

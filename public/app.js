@@ -289,12 +289,19 @@ async function loadRecentPlacements() {
 
       let companyHtml = '';
       sortedCompanies.forEach(([comp, stats], index) => {
+        const badgeColor = stats.hiringDone ? 'var(--success)' : 'var(--warning)';
+        const badgeText = stats.hiringDone ? 'Done' : 'Pending';
+        const badgeBg = stats.hiringDone ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)';
+
         companyHtml += `
           <tr class="company-row">
             <td style="padding: 15px; border-bottom: 1px solid var(--border);"><strong>${index + 1}. ${comp}</strong></td>
             <td style="padding: 15px; border-bottom: 1px solid var(--border);"><span class="badge badge-package">${stats.packageCTC || 'Undisclosed'}</span></td>
             <td style="padding: 15px; border-bottom: 1px solid var(--border);">${stats.totalPlaced}</td>
             <td style="padding: 15px; border-bottom: 1px solid var(--border);">${stats.vitBhopalPlaced} <span style="color:var(--text-muted);font-size:0.85em;">(${(stats.vitBhopalPlaced/Math.max(1, stats.totalPlaced)*100).toFixed(0)}%)</span></td>
+            <td style="padding: 15px; border-bottom: 1px solid var(--border);">
+              <span style="background: ${badgeBg}; color: ${badgeColor}; padding: 4px 8px; border-radius: 4px; font-size: 0.8em; font-weight: 600; border: 1px solid ${badgeColor};">${badgeText}</span>
+            </td>
           </tr>
         `;
       });
@@ -402,6 +409,38 @@ $id("clearBtn").addEventListener("click", () => {
   hideStatus();
   if($id("resultsToolbar")) $id("resultsToolbar").classList.add("hidden");
 });
+
+if ($id("syncGmailBtn")) {
+  $id("syncGmailBtn").addEventListener("click", () => {
+    const tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: '715718536052-1e0k29fr1n1156tekg966j1vli7cql30.apps.googleusercontent.com',
+      scope: 'https://www.googleapis.com/auth/gmail.readonly',
+      callback: async (tokenResponse) => {
+        if (tokenResponse && tokenResponse.access_token) {
+          showStatus("Syncing with Gmail...");
+          try {
+            const res = await fetch('/api/sync-gmail', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ accessToken: tokenResponse.access_token })
+            });
+            const data = await res.json();
+            if (data.success) {
+              hideStatus();
+              alert(data.message);
+              loadRecentPlacements();
+            } else {
+              showStatus("Sync Failed: " + (data.error || "Unknown"), true);
+            }
+          } catch (e) {
+            showStatus("Sync Error", true);
+          }
+        }
+      },
+    });
+    tokenClient.requestAccessToken();
+  });
+}
 
 if($id("resultsFilter")) {
   $id("resultsFilter").addEventListener("input", (e) => {

@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 const { OAuth2Client } = require('google-auth-library');
+const { google } = require('googleapis');
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 
@@ -295,14 +296,15 @@ app.get('/api/stats', async (req, res) => {
     companyStats[c.name] = { 
       totalPlaced: c.totalVitPlaced, 
       vitBhopalPlaced: 0, 
-      packageCTC: c.packageCTC || 'Undisclosed' 
+      packageCTC: c.packageCTC || 'Undisclosed',
+      hiringDone: c.hiringDone || false
     };
   });
 
   placements.forEach(p => {
     const comp = p.source || "Unknown";
     if (!companyStats[comp]) {
-      companyStats[comp] = { totalPlaced: 0, vitBhopalPlaced: 0, packageCTC: p.packageCTC || 'Undisclosed' };
+      companyStats[comp] = { totalPlaced: 0, vitBhopalPlaced: 0, packageCTC: p.packageCTC || 'Undisclosed', hiringDone: false };
     }
     
     // Check if VIT Bhopal
@@ -597,6 +599,124 @@ app.get('/', requirePageAuth, (req, res) => {
 });
 app.get('/index.html', requirePageAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'public/index.html'));
+});
+
+app.post('/api/sync-gmail', requireAuth, async (req, res) => {
+  const { accessToken } = req.body;
+  if (!accessToken) return res.status(400).json({ error: "No access token provided" });
+
+  try {
+    const auth = new OAuth2Client(GOOGLE_CLIENT_ID);
+    auth.setCredentials({ access_token: accessToken });
+    const gmail = google.gmail({ version: 'v1', auth });
+
+    // Fetch messages from noreply.cdcinfo@vit.ac.in or cdc@vitbhopal.ac.in
+    const query = '(from:noreply.cdcinfo@vit.ac.in OR from:cdc@vitbhopal.ac.in) subject:"Congratulations"';
+    const response = await gmail.users.messages.list({ userId: 'me', q: query, maxResults: 50 });
+    
+    if (!response.data.messages) {
+      return res.json({ success: true, message: "No new CDC emails found." });
+    }
+
+    let totalTracked = 0;
+    const existingCompanies = await Company.find().lean();
+    existingCompanies.sort((a, b) => a.name.length - b.name.length);
+
+    for (const msg of response.data.messages) {
+      const msgData = await gmail.users.messages.get({ userId: 'me', id: msg.id, format: 'full' });
+      const payload = msgData.data.payload;
+      
+      let subject = "Unknown";
+      let dateHeader = null;
+      payload.headers.forEach(h => {
+        if (h.name.toLowerCase() === 'subject') subject = h.value;
+        if (h.name.toLowerCase() === 'date') dateHeader = h.value;
+      });
+
+      const emailDate = dateHeader ? new Date(dateHeader) : new Date();
+
+      // Extract raw body
+      let rawBody = "";
+      if (payload.parts) {
+        const textPart = payload.parts.find(p => p.mimeType === 'text/plain');
+        if (textPart && textPart.body && textPart.body.data) {
+          rawBody = Buffer.from(textPart.body.data, 'base64').toString('utf8');
+        } else if (payload.parts[0] && payload.parts[0].body && payload.parts[0].body.data) {
+          rawBody = Buffer.from(payload.parts[0].body.data, 'base64').toString('utf8');
+        }
+      } else if (payload.body && payload.body.data) {
+        rawBody = Buffer.from(payload.body.data, 'base64').toString('utf8');
+      }
+
+      // 1. Extract Company Name from Subject
+      const companyMatch = subject.match(/Congratulations\s*!!\s*(.*?)\s+(?:Super|Dream|Internship|Selection|Placement|Offer)/i);
+      let extractedCompanyName = companyMatch ? companyMatch[1].trim() : subject;
+
+      // Clean up company name with existing companies
+      let finalCompanyName = extractedCompanyName;
+      const matchedCompany = existingCompanies.find(c => {
+        const cNameLower = c.name.toLowerCase();
+        const emailLower = finalCompanyName.toLowerCase();
+        return emailLower.includes(cNameLower) || cNameLower.includes(emailLower);
+      });
+      if (matchedCompany) finalCompanyName = matchedCompany.name;
+
+      // Mark Hiring Status as Done in DB
+      await Company.findOneAndUpdate(
+        { name: finalCompanyName },
+        { $set: { hiringDone: true } },
+        { upsert: true }
+      );
+
+      // 2. Extract Neo IDs from body
+      const regex = /\b(?![A-Za-z]+\b)(?!\d+\b)[A-Z0-9]{8,10}\b/g;
+      const matches = rawBody.match(regex) || [];
+      const possibleIds = [...new Set(matches)];
+      
+      if (possibleIds.length === 0) continue;
+
+      let addedForThisCompany = 0;
+      for (let id of possibleIds) {
+        const queryId = id.toUpperCase();
+        let foundRecord = database[queryId] || regDatabase[queryId];
+        
+        if (!foundRecord) {
+          let minDistance = Infinity;
+          let bestMatch = null;
+          for (const neoId of Object.keys(database)) {
+            const dist = levenshtein(queryId, neoId);
+            if (dist < minDistance) {
+              minDistance = dist;
+              bestMatch = neoId;
+            }
+          }
+          if (minDistance <= 2 && bestMatch) {
+            foundRecord = database[bestMatch];
+          }
+        }
+
+        if (foundRecord) {
+          const added = await addPlacement(foundRecord, finalCompanyName, emailDate, "Undisclosed");
+          if (added) {
+            addedForThisCompany++;
+            totalTracked++;
+          }
+        }
+      }
+
+      if (addedForThisCompany > 0) {
+        await Company.findOneAndUpdate(
+          { name: finalCompanyName },
+          { $inc: { totalVitPlaced: addedForThisCompany } }
+        );
+      }
+    }
+
+    res.json({ success: true, message: `Synced successfully! Tracked ${totalTracked} new placements.` });
+  } catch (error) {
+    console.error("Gmail API Error:", error);
+    res.status(500).json({ error: "Failed to sync with Gmail." });
+  }
 });
 
 // Serve static frontend files (exclude index.html from default root behavior)
