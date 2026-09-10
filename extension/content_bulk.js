@@ -32,21 +32,16 @@
       if (isAnnouncement && subject) {
         let companyName = subject;
         
-        // Attempt to extract CTC or Package from the snippet or subject
-        let packageCTC = "Undisclosed";
-        const lpaMatch = lowerText.match(/(\d+(?:\.\d+)?)\s*(?:lpa|lacs|lakhs)/);
-        if (lpaMatch) {
-          packageCTC = lpaMatch[0].toUpperCase();
-        } else {
-          const ctcMatch = lowerText.match(/(?:ctc|package|compensation)[\s:]*([₹$]?\s*\d+(?:,\d+)*(?:\.\d+)?\s*(?:lpa)?)/i);
-          if (ctcMatch && ctcMatch[1]) {
-            packageCTC = ctcMatch[1].trim().toUpperCase();
-          }
+        // Extract the email date
+        let emailDate = null;
+        const dateEl = row.querySelector('.xW.xY span');
+        if (dateEl) {
+          emailDate = dateEl.title || dateEl.innerText;
         }
 
         announcements.push({
           companyName: companyName,
-          packageCTC: packageCTC
+          packageCTC: 'Undisclosed'
         });
       }
     });

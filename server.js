@@ -478,6 +478,9 @@ app.post('/api/add-placement', async (req, res) => {
 
   // Auto-map if the email subject contains a tracked company's name
   const existingCompanies = await Company.find().lean();
+  // Sort by name length ascending so we match 'Incedo' before 'Congratulations!! Incedo...'
+  existingCompanies.sort((a, b) => a.name.length - b.name.length);
+  
   const matchedCompany = existingCompanies.find(c => {
     const cNameLower = c.name.toLowerCase();
     const emailLower = companyName.toLowerCase();
