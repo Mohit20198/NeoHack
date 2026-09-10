@@ -87,13 +87,17 @@ async function loadBranchStats() {
     btn.addEventListener("click", () => {
       // Deactivate all
       document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-      document.querySelectorAll(".tab-content").forEach(c => c.classList.add("hidden"));
+      document.querySelectorAll(".tab-content").forEach(c => {
+        c.classList.add("hidden");
+        c.classList.remove("active");
+      });
       
       // Activate clicked
       btn.classList.add("active");
       const targetId = btn.getAttribute("data-tab") || btn.getAttribute("data-target");
       if ($id(targetId)) {
         $id(targetId).classList.remove("hidden");
+        $id(targetId).classList.add("active");
       }
       
       // Load feed/stats if those tabs are clicked

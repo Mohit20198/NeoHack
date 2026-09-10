@@ -225,7 +225,7 @@ app.post('/api/lookup', requireAuth, (req, res) => {
 });
 
 // API endpoint for comprehensive branch stats
-app.get('/api/stats', requireAuth, async (req, res) => {
+app.get('/api/stats', async (req, res) => {
   const placements = await Placement.find().sort({ timestamp: -1 }).lean();
   const placedNeoIds = new Set(placements.map(p => p.neoId));
     const branchStats = {};
@@ -406,6 +406,49 @@ app.post('/api/add-company', async (req, res) => {
     res.json({ success: true, message: `Company ${companyName} tracked!` });
   } catch(err) {
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.post('/api/add-companies-bulk', async (req, res) => {
+  const apiKey = req.headers['x-api-key'];
+  if (apiKey !== NEOHACK_API_KEY) {
+    return res.status(401).json({ success: false, error: 'Unauthorized Extension' });
+  }
+
+  const { companies } = req.body;
+  if (!companies || !Array.isArray(companies)) {
+    return res.status(400).json({ error: 'Missing or invalid companies array' });
+  }
+
+  try {
+    const operations = companies.map(comp => {
+      let numericPackage = 0;
+      if (comp.packageCTC) {
+        const match = comp.packageCTC.match(/[\d.]+/);
+        if (match) numericPackage = parseFloat(match[0]);
+      }
+      return {
+        updateOne: {
+          filter: { name: comp.companyName },
+          update: { 
+            $set: { 
+              packageCTC: comp.packageCTC || 'Undisclosed', 
+              numericPackage: numericPackage 
+            } 
+          },
+          upsert: true
+        }
+      };
+    });
+
+    if (operations.length > 0) {
+      await Company.bulkWrite(operations);
+    }
+    
+    res.json({ success: true, message: `Successfully tracked ${companies.length} companies!` });
+  } catch(err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error during bulk insert' });
   }
 });
 
