@@ -293,12 +293,14 @@ app.get('/api/stats', async (req, res) => {
       
       // Attempt to parse package for Bhopal math
       let numericVal = 0;
-      if (p.packageCTC) {
+      if (p.packageCTC && p.packageCTC !== 'Undisclosed') {
         const match = p.packageCTC.match(/[\d.]+/);
         if (match) {
           numericVal = parseFloat(match[0]);
         }
-      } else {
+      } 
+      
+      if (numericVal === 0) {
         // Fallback to company DB if exist
         const dbComp = companiesFromDB.find(c => c.name === comp);
         if (dbComp && dbComp.numericPackage > 0) numericVal = dbComp.numericPackage;

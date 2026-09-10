@@ -1,7 +1,7 @@
 // Fetch companies on load
 document.addEventListener('DOMContentLoaded', async () => {
   try {
-    const res = await fetch('https://neohack.onrender.com/api/companies');
+    const res = await fetch('http://localhost:3000/api/companies');
     if (res.ok) {
       const companies = await res.json();
       const select = document.getElementById('companySelect');
@@ -51,7 +51,7 @@ async function executeExtraction(endpoint, isAnnouncement, overrideCompanyName =
       statusEl.textContent = `Found ${data.possibleIds.length} potential IDs. Sending...`;
     }
 
-    const response = await fetch(`https://neohack.onrender.com${endpoint}`, {
+    const response = await fetch(`http://localhost:3000${endpoint}`, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
@@ -108,7 +108,7 @@ document.getElementById('trackBulkBtn').addEventListener('click', async () => {
 
     statusEl.textContent = `Found ${data.length} companies. Sending...`;
 
-    const response = await fetch(`https://neohack.onrender.com/api/add-companies-bulk`, {
+    const response = await fetch(`http://localhost:3000/api/add-companies-bulk`, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
@@ -156,7 +156,7 @@ document.getElementById('trackNeopatBtn').addEventListener('click', async () => 
 
     statusEl.textContent = `Found ${data.length} companies. Sending...`;
 
-    const response = await fetch(`https://neohack.onrender.com/api/add-companies-bulk`, {
+    const response = await fetch(`http://localhost:3000/api/add-companies-bulk`, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
