@@ -473,12 +473,24 @@ app.post('/api/add-placement', async (req, res) => {
     return res.status(400).json({ error: 'Missing possible IDs' });
   }
 
-  let addedStudents = [];
-  let trackedStudents = [];
+  let finalCompanyName = companyName;
+
+  // Auto-map if the email subject contains a tracked company's name
+  const existingCompanies = await Company.find().lean();
+  const matchedCompany = existingCompanies.find(c => {
+    const cNameLower = c.name.toLowerCase();
+    const emailLower = companyName.toLowerCase();
+    // E.g. "Groww" is in "Congratulations!! Groww Super Dream Internship"
+    return emailLower.includes(cNameLower) || cNameLower.includes(emailLower);
+  });
+
+  if (matchedCompany) {
+    finalCompanyName = matchedCompany.name;
+  }
   
   // Track Total VIT Placements in Company
   await Company.findOneAndUpdate(
-    { name: companyName },
+    { name: finalCompanyName },
     { $set: { totalVitPlaced: possibleIds.length } },
     { upsert: true }
   );
