@@ -252,76 +252,76 @@ function showNotFound(query) {
 // ── Recent Placements & Stats ──────────────────────────
 async function loadRecentPlacements() {
   try {
-    const res = await fetch('/api/recent');
-    if (res.status === 401) { window.location.href = '/login.html'; return; }
-    if (!res.ok) return;
-    const data = await res.json();
+    const resRecent = await fetch('/api/recent');
+    const resStats = await fetch('/api/stats');
+    if (resRecent.status === 401 || resStats.status === 401) { window.location.href = '/login.html'; return; }
+    if (!resRecent.ok || !resStats.ok) return;
+    
+    const recentData = await resRecent.json();
+    const statsData = await resStats.json();
     
     // Update Total Placed
-    $id("statPlaced").textContent = data.totalPlaced || 0;
+    $id("statPlaced").textContent = statsData.totalPlaced || 0;
 
     // Render Company Stats
-    if (data.companyStats && Object.keys(data.companyStats).length > 0) {
+    if (statsData.companyStats && Object.keys(statsData.companyStats).length > 0) {
       $id("companyStatsSection").classList.remove("hidden");
       const container = $id("companyStatsList");
       
-      // Sort companies by count descending
-      const sortedCompanies = Object.entries(data.companyStats)
-        .sort((a, b) => b[1] - a[1]);
+      // Sort companies by total placed descending
+      const sortedCompanies = Object.entries(statsData.companyStats)
+        .sort((a, b) => b[1].totalPlaced - a[1].totalPlaced);
 
-      let tableHtml = `
-        <table class="company-table">
-          <thead>
-            <tr>
-              <th>Company Name</th>
-              <th style="text-align: right;">Total Placements</th>
-            </tr>
-          </thead>
-          <tbody>
-      `;
-      
-      sortedCompanies.forEach(([comp, count]) => {
-        // Filter students for this company
-        const students = data.placements.filter(p => p.source === comp);
-        let studentsListHtml = `<div class="company-students-list">`;
-        students.forEach(s => {
-          studentsListHtml += `<div class="company-student-item"><strong>${s.name}</strong> <span>(${s.regNo || s.neoId})</span></div>`;
-        });
-        studentsListHtml += `</div>`;
-
-        // Create safe ID for the accordion
-        const safeId = "comp-" + comp.replace(/[^a-zA-Z0-9]/g, "");
-
-        tableHtml += `
-          <tr class="company-row" onclick="document.getElementById('${safeId}').classList.toggle('hidden')">
-            <td style="cursor: pointer;">
-              <div style="display: flex; align-items: center; justify-content: space-between;">
-                <span>${comp}</span>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" opacity="0.5">
-                  <polyline points="6 9 12 15 18 9"></polyline>
-                </svg>
-              </div>
-            </td>
-            <td style="text-align: right; cursor: pointer;"><span class="comp-count-badge">${count}</span></td>
-          </tr>
-          <tr id="${safeId}" class="hidden company-details-row">
-            <td colspan="2" style="padding: 0; border: none;">
-              ${studentsListHtml}
-            </td>
+      let companyHtml = '';
+      sortedCompanies.forEach(([comp, stats]) => {
+        companyHtml += `
+          <tr class="company-row">
+            <td style="padding: 15px; border-bottom: 1px solid var(--border);"><strong>${comp}</strong></td>
+            <td style="padding: 15px; border-bottom: 1px solid var(--border);"><span class="badge badge-package">${stats.packageCTC || 'Undisclosed'}</span></td>
+            <td style="padding: 15px; border-bottom: 1px solid var(--border);">${stats.totalPlaced}</td>
+            <td style="padding: 15px; border-bottom: 1px solid var(--border);">${stats.vitBhopalPlaced} <span style="color:var(--text-muted);font-size:0.85em;">(${(stats.vitBhopalPlaced/stats.totalPlaced*100).toFixed(0)}%)</span></td>
           </tr>
         `;
       });
+      container.innerHTML = companyHtml;
+    }
+
+    // Render CGPA Stats
+    if (statsData.cgpaStats) {
+      $id("cgpaStatsSection").classList.remove("hidden");
+      const container = $id("cgpaStatsList");
+      let cgpaHtml = '';
       
-      tableHtml += `
-          </tbody>
-        </table>
-      `;
-      
-      container.innerHTML = tableHtml;
+      const order = ['9-10', '8-9', '7-8', '6-7', 'Below 6', 'Unknown'];
+      order.forEach(range => {
+        const stats = statsData.cgpaStats[range];
+        if (stats) {
+          const total = stats.placed + stats.unplaced;
+          const percentage = total > 0 ? ((stats.placed / total) * 100).toFixed(1) : 0;
+          
+          cgpaHtml += `
+            <tr>
+              <td style="padding: 15px; border-bottom: 1px solid var(--border);"><strong>${range}</strong></td>
+              <td style="padding: 15px; border-bottom: 1px solid var(--border); color: var(--success);">${stats.placed}</td>
+              <td style="padding: 15px; border-bottom: 1px solid var(--border); color: var(--danger);">${stats.unplaced}</td>
+              <td style="padding: 15px; border-bottom: 1px solid var(--border);">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span>${total}</span>
+                  <div style="flex: 1; height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden;">
+                    <div style="height: 100%; width: ${percentage}%; background: var(--success);"></div>
+                  </div>
+                  <span style="font-size: 0.8em; color: var(--text-muted);">${percentage}% Placed</span>
+                </div>
+              </td>
+            </tr>
+          `;
+        }
+      });
+      container.innerHTML = cgpaHtml;
     }
 
     // Render Recent Placements Feed
-    const placements = data.recent || [];
+    const placements = recentData.recent || [];
     if (placements.length > 0) {
       $id("recentPlacementsSection").classList.remove("hidden");
       const list = $id("recentPlacementsList");
@@ -334,7 +334,7 @@ async function loadRecentPlacements() {
             <div class="recent-avatar">★</div>
             <div class="recent-details">
               <strong>${p.name}</strong> (${p.neoId}) placed at <strong>${p.source}</strong>!<br/>
-              <small>Reg: ${p.regNo} · ${date}</small>
+              <small>Package: <strong>${p.packageCTC || 'Undisclosed'}</strong> · ${date}</small>
             </div>
           </div>
         `;

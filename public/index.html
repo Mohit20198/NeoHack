@@ -140,14 +140,54 @@
 
       <!-- Company Stats -->
       <div id="companyStatsSection" class="company-stats-section hidden" style="margin-bottom: 40px;">
-        <div class="recent-header" style="justify-content: center;">
+        <div class="recent-header" style="justify-content: center; margin-bottom: 20px;">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 20v-6M6 20V10M18 20V4"></path>
           </svg>
           <h3>Company Placement Breakdown</h3>
         </div>
-        <div id="companyStatsList" style="max-width: 800px; margin: 0 auto;">
-          <!-- Injected dynamically -->
+        <div class="table-container" style="max-width: 900px; margin: 0 auto; overflow-x: auto; background: var(--card); border-radius: 12px; border: 1px solid var(--border);">
+          <table style="width: 100%; border-collapse: collapse; text-align: left;">
+            <thead>
+              <tr style="border-bottom: 1px solid var(--border); background: rgba(0, 0, 0, 0.2);">
+                <th style="padding: 15px; color: var(--text-muted); font-weight: 500;">Company</th>
+                <th style="padding: 15px; color: var(--text-muted); font-weight: 500;">Package (CTC)</th>
+                <th style="padding: 15px; color: var(--text-muted); font-weight: 500;">Total Placed</th>
+                <th style="padding: 15px; color: var(--text-muted); font-weight: 500;">VIT Bhopal</th>
+              </tr>
+            </thead>
+            <tbody id="companyStatsList">
+              <!-- Injected dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- CGPA Stats -->
+      <div id="cgpaStatsSection" class="cgpa-stats-section hidden" style="margin-bottom: 40px;">
+        <div class="recent-header" style="justify-content: center; margin-bottom: 20px;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 3v18h18"/>
+            <path d="M18 17V9"/>
+            <path d="M13 17V5"/>
+            <path d="M8 17v-3"/>
+          </svg>
+          <h3>CGPA Analytics</h3>
+        </div>
+        <div class="table-container" style="max-width: 900px; margin: 0 auto; overflow-x: auto; background: var(--card); border-radius: 12px; border: 1px solid var(--border);">
+          <table style="width: 100%; border-collapse: collapse; text-align: left;">
+            <thead>
+              <tr style="border-bottom: 1px solid var(--border); background: rgba(0, 0, 0, 0.2);">
+                <th style="padding: 15px; color: var(--text-muted); font-weight: 500;">CGPA Range</th>
+                <th style="padding: 15px; color: var(--text-muted); font-weight: 500;">Placed</th>
+                <th style="padding: 15px; color: var(--text-muted); font-weight: 500;">Unplaced</th>
+                <th style="padding: 15px; color: var(--text-muted); font-weight: 500;">Total Students</th>
+              </tr>
+            </thead>
+            <tbody id="cgpaStatsList">
+              <!-- Injected dynamically -->
+            </tbody>
+          </table>
         </div>
       </div>
       

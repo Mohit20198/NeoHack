@@ -46,18 +46,34 @@
       emailDate = dateEl.title || dateEl.innerText;
     }
 
-    // Extract full email text for name matching
+    // Extract full email text for name matching and CTC extraction
     let emailText = "";
     const bodyEl = document.querySelector('.a3s');
     if (bodyEl) {
       emailText = bodyEl.innerText;
     }
 
+    // Attempt to extract CTC or Package
+    let packageCTC = "Undisclosed";
+    if (emailText) {
+      // Regex to find "X LPA", "X.Y LPA", "INR X,00,000", "CTC: X"
+      const lpaMatch = emailText.match(/(\d+(?:\.\d+)?)\s*(?:LPA|lpa|Lacs|lacs|Lakhs|lakhs)/);
+      if (lpaMatch) {
+        packageCTC = lpaMatch[0].trim().toUpperCase();
+      } else {
+        const ctcMatch = emailText.match(/(?:CTC|Package|Compensation)[\s:]*([₹$]?\s*\d+(?:,\d+)*(?:\.\d+)?\s*(?:LPA|lpa)?)/i);
+        if (ctcMatch && ctcMatch[1]) {
+          packageCTC = ctcMatch[1].trim();
+        }
+      }
+    }
+
     return {
       companyName: companyName,
       possibleIds: [...new Set(possibleIds)],
       emailDate: emailDate,
-      emailText: emailText
+      emailText: emailText,
+      packageCTC: packageCTC
     };
   }
 

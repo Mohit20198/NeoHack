@@ -5,6 +5,7 @@ const placementSchema = new mongoose.Schema({
   neoId: { type: String, required: true },
   regNo: { type: String },
   source: { type: String, required: true },
+  packageCTC: { type: String, default: 'Undisclosed' },
   timestamp: { type: Date, default: Date.now }
 });
 

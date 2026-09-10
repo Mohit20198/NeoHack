@@ -18,7 +18,7 @@ mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/neohack")
   .then(() => console.log("Connected to MongoDB!"))
   .catch(err => console.error("MongoDB Connection Error:", err));
 
-async function addPlacement(record, companyName, emailDate) {
+async function addPlacement(record, companyName, emailDate, packageCTC) {
   const existing = await Placement.findOne({ neoId: record.neoId });
   
   if (!existing) {
@@ -27,6 +27,7 @@ async function addPlacement(record, companyName, emailDate) {
       neoId: record.neoId,
       regNo: record.regNo,
       source: companyName || "Unknown Company",
+      packageCTC: packageCTC || "Undisclosed",
       timestamp: emailDate ? new Date(emailDate) : new Date()
     };
     await Placement.create(entry);
@@ -252,10 +253,58 @@ app.get('/api/stats', requireAuth, async (req, res) => {
       }
     });
 
+  // Calculate Company Stats
+  const companyStats = {};
+  placements.forEach(p => {
+    const comp = p.source || "Unknown";
+    if (!companyStats[comp]) {
+      companyStats[comp] = { totalPlaced: 0, vitBhopalPlaced: 0, packageCTC: p.packageCTC || 'Undisclosed' };
+    }
+    companyStats[comp].totalPlaced += 1;
+    
+    // Check if VIT Bhopal
+    const student = database[p.neoId];
+    if (student && student.offEmail && student.offEmail.toLowerCase().includes('vitbhopal.ac.in')) {
+      companyStats[comp].vitBhopalPlaced += 1;
+    }
+  });
+
+  // Calculate CGPA Stats
+  const cgpaStats = {
+    '9-10': { placed: 0, unplaced: 0 },
+    '8-9': { placed: 0, unplaced: 0 },
+    '7-8': { placed: 0, unplaced: 0 },
+    '6-7': { placed: 0, unplaced: 0 },
+    'Below 6': { placed: 0, unplaced: 0 },
+    'Unknown': { placed: 0, unplaced: 0 }
+  };
+
+  Object.values(database).forEach(student => {
+    let bin = 'Unknown';
+    if (student.cgpa) {
+      const gpa = parseFloat(student.cgpa);
+      if (!isNaN(gpa)) {
+        if (gpa >= 9) bin = '9-10';
+        else if (gpa >= 8) bin = '8-9';
+        else if (gpa >= 7) bin = '7-8';
+        else if (gpa >= 6) bin = '6-7';
+        else bin = 'Below 6';
+      }
+    }
+    
+    if (placedNeoIds.has(student.neoId)) {
+      cgpaStats[bin].placed += 1;
+    } else {
+      cgpaStats[bin].unplaced += 1;
+    }
+  });
+
   res.json({
     totalStudents: Object.keys(database).length,
     totalPlaced: placedNeoIds.size,
-    branchStats
+    branchStats,
+    companyStats,
+    cgpaStats
   });
 });
 
@@ -287,7 +336,7 @@ app.post('/api/add-placement', async (req, res) => {
     return res.status(401).json({ success: false, error: 'Unauthorized Extension' });
   }
 
-  const { possibleIds, companyName, emailDate, emailText } = req.body;
+  const { possibleIds, companyName, emailDate, emailText, packageCTC } = req.body;
   if (!possibleIds || !Array.isArray(possibleIds)) {
     return res.status(400).json({ error: 'Missing possible IDs' });
   }
@@ -301,7 +350,7 @@ app.post('/api/add-placement', async (req, res) => {
     let foundRecord = database[query] || regDatabase[query];
     
     if (foundRecord) {
-      const added = await addPlacement(foundRecord, companyName, emailDate);
+      const added = await addPlacement(foundRecord, companyName, emailDate, packageCTC);
       if (added) {
         addedStudents.push(foundRecord.name);
       } else {
@@ -325,7 +374,7 @@ app.post('/api/add-placement', async (req, res) => {
           // Rule: "dont add if duplicate names"
           if (studentsArray.length === 1) {
             const foundRecord = studentsArray[0];
-            const added = await addPlacement(foundRecord, companyName, emailDate);
+            const added = await addPlacement(foundRecord, companyName, emailDate, packageCTC);
             if (added) {
               addedStudents.push(foundRecord.name);
             } else {
