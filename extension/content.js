@@ -32,9 +32,13 @@
 
     // Split text into words and look for 8-10 character alphanumeric strings
     const words = fullText.split(/[\s,.:;'"\n\r()\[\]]+/);
+    const regNoPattern = /^[0-9]{2}[A-Z]{3}[0-9]{4,5}$/;
+    // Neo ID must be exactly 8 characters, alphanumeric, and contain at least one digit and one letter
+    const neoIdPattern = /^(?=.*[0-9])(?=.*[A-Z])[A-Z0-9]{8}$/;
+
     for (const word of words) {
       const cleanWord = word.trim().toUpperCase();
-      if (cleanWord.length >= 8 && cleanWord.length <= 10 && /^[A-Z0-9]+$/.test(cleanWord)) {
+      if (regNoPattern.test(cleanWord) || neoIdPattern.test(cleanWord)) {
         possibleIds.push(cleanWord);
       }
     }
