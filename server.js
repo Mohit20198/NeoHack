@@ -46,6 +46,25 @@ app.use(express.json());
 app.use(cookieParser());
 
 // Auth Helpers
+function levenshtein(a, b) {
+  if(a.length === 0) return b.length;
+  if(b.length === 0) return a.length;
+  var matrix = [];
+  var i, j;
+  for(i = 0; i <= b.length; i++) matrix[i] = [i];
+  for(j = 0; j <= a.length; j++) matrix[0][j] = j;
+  for(i = 1; i <= b.length; i++){
+      for(j = 1; j <= a.length; j++){
+          if(b.charAt(i-1) == a.charAt(j-1)){
+              matrix[i][j] = matrix[i-1][j-1];
+          } else {
+              matrix[i][j] = Math.min(matrix[i-1][j-1] + 1, Math.min(matrix[i][j-1] + 1, matrix[i-1][j] + 1));
+          }
+      }
+  }
+  return matrix[b.length][a.length];
+}
+
 function getApprovedEmails() {
   try {
     const data = fs.readFileSync(path.join(__dirname, 'approved_emails.json'), 'utf8');
@@ -508,8 +527,25 @@ app.post('/api/add-placement', async (req, res) => {
     const query = id.toUpperCase();
     let foundRecord = database[query] || regDatabase[query];
     
+    if (!foundRecord) {
+      // Fuzzy matching for CDC typos in Neo IDs (max distance 2)
+      let minDistance = Infinity;
+      let bestMatch = null;
+      for (const neoId of Object.keys(database)) {
+        const dist = levenshtein(query, neoId);
+        if (dist < minDistance) {
+          minDistance = dist;
+          bestMatch = neoId;
+        }
+      }
+      if (minDistance <= 2 && bestMatch) {
+        console.log(`[FUZZY MATCH] CDC typo detected: ${query} matched to ${bestMatch} (distance: ${minDistance})`);
+        foundRecord = database[bestMatch];
+      }
+    }
+
     if (foundRecord) {
-      const added = await addPlacement(foundRecord, companyName, emailDate, packageCTC);
+      const added = await addPlacement(foundRecord, finalCompanyName, emailDate, packageCTC);
       if (added) {
         addedStudents.push(foundRecord.name);
       } else {
@@ -533,7 +569,7 @@ app.post('/api/add-placement', async (req, res) => {
           // Rule: "dont add if duplicate names"
           if (studentsArray.length === 1) {
             const foundRecord = studentsArray[0];
-            const added = await addPlacement(foundRecord, companyName, emailDate, packageCTC);
+            const added = await addPlacement(foundRecord, finalCompanyName, emailDate, packageCTC);
             if (added) {
               addedStudents.push(foundRecord.name);
             } else {
