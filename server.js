@@ -610,8 +610,8 @@ app.post('/api/sync-gmail', requireAuth, async (req, res) => {
     auth.setCredentials({ access_token: accessToken });
     const gmail = google.gmail({ version: 'v1', auth });
 
-    // Fetch messages from noreply.cdcinfo@vit.ac.in or cdc@vitbhopal.ac.in
-    const query = '(from:noreply.cdcinfo@vit.ac.in OR from:cdc@vitbhopal.ac.in) subject:"Congratulations"';
+    // Fetch messages from noreply.cdcinfo@vit.ac.in, cdc@vitbhopal.ac.in, or vitlions2027@vitbhopal.ac.in
+    const query = '(from:noreply.cdcinfo@vit.ac.in OR from:cdc@vitbhopal.ac.in OR from:vitlions2027@vitbhopal.ac.in) subject:"Congratulations"';
     const response = await gmail.users.messages.list({ userId: 'me', q: query, maxResults: 50 });
     
     if (!response.data.messages) {
