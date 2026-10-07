@@ -368,7 +368,11 @@ app.get('/api/stats', requireAuth, async (req, res) => {
   let studentsToConsider = Object.values(database);
   
   if (batchFilter) {
-    placements = placements.filter(p => p.regNo && p.regNo.startsWith(batchFilter));
+    placements = placements.filter(p => {
+      const student = database[p.neoId];
+      const actualRegNo = student ? student.regNo : p.regNo;
+      return actualRegNo && actualRegNo.startsWith(batchFilter);
+    });
     studentsToConsider = studentsToConsider.filter(s => s.regNo && s.regNo.startsWith(batchFilter));
   }
   
@@ -513,7 +517,11 @@ app.get('/api/recent', requireAuth, async (req, res) => {
   let placements = await Placement.find().sort({ timestamp: -1 }).lean();
   
   if (batchFilter) {
-    placements = placements.filter(p => p.regNo && p.regNo.startsWith(batchFilter));
+    placements = placements.filter(p => {
+      const student = database[p.neoId];
+      const actualRegNo = student ? student.regNo : p.regNo;
+      return actualRegNo && actualRegNo.startsWith(batchFilter);
+    });
   }
   
   // Calculate company stats
