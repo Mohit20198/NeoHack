@@ -231,6 +231,35 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', uptime: process.uptime() });
 });
 
+// Debug endpoint to verify batch filtering
+app.get('/api/debug-batch', requireAuth, async (req, res) => {
+  const allPlacements = await Placement.find().lean();
+  const batch23 = [];
+  const batch22 = [];
+  const noMatch = [];
+  
+  allPlacements.forEach(p => {
+    const key = (p.neoId || '').toUpperCase();
+    const student = database[key];
+    const regNo = student ? student.regNo : p.regNo;
+    
+    if (regNo && regNo.startsWith('23')) batch23.push({ neoId: p.neoId, regNo, name: p.name });
+    else if (regNo && regNo.startsWith('22')) batch22.push({ neoId: p.neoId, regNo, name: p.name });
+    else noMatch.push({ neoId: p.neoId, regNoFromDB: p.regNo, regNoFromCSV: student ? student.regNo : 'NOT_IN_CSV', name: p.name });
+  });
+  
+  res.json({
+    totalPlacements: allPlacements.length,
+    totalInMemoryDB: Object.keys(database).length,
+    batch23Count: batch23.length,
+    batch22Count: batch22.length,
+    noMatchCount: noMatch.length,
+    batch23Sample: batch23.slice(0, 5),
+    batch22Sample: batch22.slice(0, 5),
+    noMatchSample: noMatch.slice(0, 10)
+  });
+});
+
 // Gmail OAuth routes (connect + callback)
 app.use('/api/auth', gmailAuthRouter);
 
@@ -369,14 +398,15 @@ app.get('/api/stats', requireAuth, async (req, res) => {
   
   if (batchFilter) {
     placements = placements.filter(p => {
-      const student = database[p.neoId];
+      const key = (p.neoId || '').toUpperCase();
+      const student = database[key];
       const actualRegNo = student ? student.regNo : p.regNo;
       return actualRegNo && actualRegNo.startsWith(batchFilter);
     });
     studentsToConsider = studentsToConsider.filter(s => s.regNo && s.regNo.startsWith(batchFilter));
   }
   
-  const placedNeoIds = new Set(placements.map(p => p.neoId));
+  const placedNeoIds = new Set(placements.map(p => (p.neoId || '').toUpperCase()));
     const branchStats = {};
     
     studentsToConsider.forEach(student => {
@@ -428,7 +458,7 @@ app.get('/api/stats', requireAuth, async (req, res) => {
     }
     
     // Check if VIT Bhopal
-    const student = database[p.neoId];
+    const student = database[(p.neoId || '').toUpperCase()];
     if (student && student.offEmail && student.offEmail.toLowerCase().includes('vitbhopal.ac.in')) {
       companyStats[comp].vitBhopalPlaced += 1;
       
@@ -518,7 +548,8 @@ app.get('/api/recent', requireAuth, async (req, res) => {
   
   if (batchFilter) {
     placements = placements.filter(p => {
-      const student = database[p.neoId];
+      const key = (p.neoId || '').toUpperCase();
+      const student = database[key];
       const actualRegNo = student ? student.regNo : p.regNo;
       return actualRegNo && actualRegNo.startsWith(batchFilter);
     });
