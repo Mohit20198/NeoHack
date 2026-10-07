@@ -391,6 +391,7 @@ app.get('/api/companies', async (req, res) => {
 
 // API endpoint for comprehensive branch stats
 app.get('/api/stats', requireAuth, async (req, res) => {
+  res.set('Cache-Control', 'no-store');
   const batchFilter = req.query.batch;
   
   let placements = await Placement.find().sort({ timestamp: -1 }).lean();
@@ -543,6 +544,7 @@ app.get('/api/stats', requireAuth, async (req, res) => {
 
 // API endpoint for recent placements
 app.get('/api/recent', requireAuth, async (req, res) => {
+  res.set('Cache-Control', 'no-store');
   const batchFilter = req.query.batch;
   let placements = await Placement.find().sort({ timestamp: -1 }).lean();
   

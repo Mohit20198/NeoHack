@@ -396,7 +396,7 @@ async function loadRecentPlacements() {
         `;
         list.insertAdjacentHTML("beforeend", html);
       });
-    } else if (batchFilter) {
+    } else if (currentBatch) {
       $id("recentPlacementsSection").classList.remove("hidden");
       const list = $id("recentPlacementsList");
       list.innerHTML = `<div style="text-align:center;padding:20px;color:var(--text-muted);">No placed students found for batch ${currentBatch}</div>`;
