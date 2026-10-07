@@ -302,6 +302,7 @@ async function loadRecentPlacements() {
     
     // Update Total Placed
     $id("statPlaced").textContent = statsData.totalPlaced || 0;
+    if ($id("feedTotalCount")) $id("feedTotalCount").textContent = (statsData.totalPlaced || 0) + " Placed";
 
     if (statsData.companyStats) {
       $id("statTotalCompanies").textContent = Object.keys(statsData.companyStats).length;
