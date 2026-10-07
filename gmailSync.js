@@ -50,11 +50,11 @@ function extractCompanyFromSubject(subject) {
   let m;
 
   // Pattern 1 — "Congratulations!! <Company> Super/Dream/Internship/..."
-  m = subject.match(/Congratulations[!?\s]*!?\s*(.*?)\s+(?:Super|Dream|Internship|Selection|Placement|Offer)/i);
+  m = subject.match(/(?:Congratulations|Congrats)[!?\s]*!?\s*(.*?)\s+(?:Super|Dream|Internship|Selection|Placement|Offer)/i);
   if (m && m[1].trim()) return m[1].trim();
 
   // Pattern 2 — "Congratulations!! <Company> - ..."
-  m = subject.match(/Congratulations[!?\s]*!?\s*(.*?)\s*[-–]/i);
+  m = subject.match(/(?:Congratulations|Congrats)[!?\s]*!?\s*(.*?)\s*[-–]/i);
   if (m && m[1].trim()) return m[1].trim();
 
   // Pattern 3 — "Selection List - <Company>"
@@ -207,7 +207,7 @@ async function runGmailSync(auth, database, regDatabase, nameDatabase) {
 
     // Find the last successful sync to avoid rescanning old emails
     const lastSync = await SyncLog.findOne({ status: 'success' }).sort({ startedAt: -1 });
-    let query = '(from:noreply.cdcinfo@vit.ac.in OR from:cdc@vitbhopal.ac.in OR from:vitlions2027@vitbhopal.ac.in) subject:"Congratulations"';
+    let query = '(from:noreply.cdcinfo@vit.ac.in OR from:cdc@vitbhopal.ac.in OR from:vitlions2027@vitbhopal.ac.in) (subject:"Congratulations" OR subject:"Congrats")';
     
     if (lastSync) {
       // Gmail 'after' query expects seconds (UNIX timestamp)
