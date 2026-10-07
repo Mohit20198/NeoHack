@@ -352,7 +352,7 @@ function loadDatabase() {
 loadDatabase();
 
 // API endpoint for looking up Neo IDs
-app.post('/api/lookup', requireAuth, (req, res) => {
+app.post('/api/lookup', requireAuth, async (req, res) => {
   const queries = req.body.queries || [];
   
   if (!Array.isArray(queries)) {
@@ -360,22 +360,49 @@ app.post('/api/lookup', requireAuth, (req, res) => {
   }
 
   const results = {};
+  const allFoundStudents = [];
   
   queries.forEach(query => {
     const uppercaseQuery = query.toUpperCase();
     
     if (database[uppercaseQuery]) {
-      results[uppercaseQuery] = [database[uppercaseQuery]];
+      const student = { ...database[uppercaseQuery] };
+      results[uppercaseQuery] = [student];
+      allFoundStudents.push(student);
     } else if (regDatabase[uppercaseQuery]) {
-      results[uppercaseQuery] = [regDatabase[uppercaseQuery]];
+      const student = { ...regDatabase[uppercaseQuery] };
+      results[uppercaseQuery] = [student];
+      allFoundStudents.push(student);
     } else {
       // Partial name search
-      const matches = Object.values(database).filter(r => r.name.toUpperCase().includes(uppercaseQuery));
+      const matches = Object.values(database)
+        .filter(r => r.name.toUpperCase().includes(uppercaseQuery))
+        .map(r => ({ ...r }));
       if (matches.length > 0) {
         results[uppercaseQuery] = matches;
+        allFoundStudents.push(...matches);
       }
     }
   });
+
+  // Cross-reference with Placements to see if they are placed
+  if (allFoundStudents.length > 0) {
+    const neoIds = allFoundStudents.map(s => s.neoId).filter(Boolean);
+    if (neoIds.length > 0) {
+      const placements = await Placement.find({ neoId: { $in: neoIds } }).lean();
+      const placementMap = {};
+      placements.forEach(p => {
+        if (p.neoId) placementMap[p.neoId.toUpperCase()] = p;
+      });
+      
+      allFoundStudents.forEach(student => {
+        if (student.neoId && placementMap[student.neoId.toUpperCase()]) {
+          student.isPlaced = true;
+          student.placementSource = placementMap[student.neoId.toUpperCase()].source;
+        }
+      });
+    }
+  }
 
   res.json({ results, totalStudents });
 });

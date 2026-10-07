@@ -232,14 +232,17 @@ function renderSearchResults() {
     allFoundRecords.forEach(r => {
       const cgpaNum = parseFloat(r.cgpa) || 0;
       const cgpaColor = cgpaNum >= 8.5 ? '#10b981' : (cgpaNum > 0 ? 'var(--text)' : 'var(--text-muted)');
+      const isPlacedStyle = r.isPlaced ? 'color: #10b981;' : '';
+      const placedBadge = r.isPlaced ? ` <span style="background: rgba(16, 185, 129, 0.1); color: #10b981; font-size: 0.75em; padding: 2px 6px; border-radius: 4px; margin-left: 8px;">Placed at ${r.placementSource || 'Company'}</span>` : '';
+      
       tableHtml += `
-        <tr style="border-bottom: 1px solid var(--border); transition: background 0.2s;">
-          <td style="padding: 12px 15px; font-weight: 600;">${r.name}</td>
-          <td style="padding: 12px 15px; font-family: monospace; color: var(--primary);">${r.neoId || '-'}</td>
+        <tr style="border-bottom: 1px solid var(--border); transition: background 0.2s; ${isPlacedStyle}">
+          <td style="padding: 12px 15px; font-weight: 600;">${r.name}${placedBadge}</td>
+          <td style="padding: 12px 15px; font-family: monospace; ${r.isPlaced ? 'color: #10b981;' : 'color: var(--primary);'}">${r.neoId || '-'}</td>
           <td style="padding: 12px 15px;">${r.regNo || '-'}</td>
-          <td style="padding: 12px 15px; font-size: 0.9em; color: var(--text-muted);">${r.email || '-'}</td>
-          <td style="padding: 12px 15px; font-weight: 600; color: ${cgpaColor};">${r.cgpa || '-'}</td>
-          <td style="padding: 12px 15px; font-size: 0.9em; color: var(--text-muted);">
+          <td style="padding: 12px 15px; font-size: 0.9em; ${r.isPlaced ? 'color: #10b981;' : 'color: var(--text-muted);'}">${r.email || '-'}</td>
+          <td style="padding: 12px 15px; font-weight: 600; color: ${r.isPlaced ? '#10b981' : cgpaColor};">${r.cgpa || '-'}</td>
+          <td style="padding: 12px 15px; font-size: 0.9em; ${r.isPlaced ? 'color: #10b981;' : 'color: var(--text-muted);'}">
             ${r.tenth && r.tenth !== '-' ? r.tenth + (r.tenth.includes('%') ? '' : '%') : '-'} / 
             ${r.twelfth && r.twelfth !== '-' ? r.twelfth + (r.twelfth.includes('%') ? '' : '%') : '-'}
           </td>
