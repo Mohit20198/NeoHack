@@ -158,32 +158,9 @@ async function doSearch() {
     localStorage.setItem("lookups_today", searchesToday);
     $id("statSearches").textContent = searchesToday;
 
-    // Clear results
-    $id("resultsContainer").innerHTML = "";
-    
-    // Separate found vs not found
-    const foundQueries = queries.filter(q => data.results[q] && data.results[q].length > 0);
-    const notFoundQueries = queries.filter(q => !data.results[q] || data.results[q].length === 0);
-    
-    let studentsFoundCount = 0;
-
-    // Render found first
-    foundQueries.forEach(query => {
-      const records = data.results[query];
-      studentsFoundCount += records.length;
-      records.forEach(record => showResult(query, record));
-    });
-
-    // Render not found last
-    notFoundQueries.forEach(query => {
-      showNotFound(query);
-    });
-
-    // Show toolbar with count if search performed
-    if (queries.length > 0 && $id("resultsCount") && $id("resultsToolbar")) {
-      $id("resultsCount").textContent = `Found ${studentsFoundCount} student${studentsFoundCount !== 1 ? 's' : ''}`;
-      $id("resultsToolbar").classList.remove("hidden");
-    }
+    currentSearchData = data;
+    currentSearchQueries = queries;
+    renderSearchResults();
 
   } catch (error) {
     console.error("Search failed:", error);
@@ -191,73 +168,129 @@ async function doSearch() {
   }
 }
 
-// ── Display Result ─────────────────────────────
-function showResult(query, r) {
-  const initials = r.name.split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase();
-  const html = `
-    <div class="result-card">
-      <div class="result-header">
-        <div class="result-avatar">${initials}</div>
-        <div class="result-title-block">
-          <div class="result-found-badge">✓ Student Found</div>
-          <h2 class="result-name">${r.name}</h2>
-          <div class="result-neo">Neo ID: ${r.neoId || query}</div>
-        </div>
-      </div>
-      <div class="result-grid">
-        <div class="result-field">
-          <div class="field-label">Registration Number</div>
-          <div class="field-value mono">${r.regNo}</div>
-        </div>
-        <div class="result-field">
-          <div class="field-label">Personal Email</div>
-          <div class="field-value">${r.email}</div>
-        </div>
-          <div class="result-field full-width">
-            <div class="field-label">Official College Email</div>
-            <div class="field-value">${r.offEmail}</div>
+let currentSearchData = null;
+let currentSearchQueries = [];
+
+function renderSearchResults() {
+  if (!currentSearchData || currentSearchQueries.length === 0) return;
+
+  $id("resultsContainer").innerHTML = "";
+
+  const data = currentSearchData;
+  const queries = currentSearchQueries;
+
+  // Separate found vs not found
+  const foundQueries = queries.filter(q => data.results[q] && data.results[q].length > 0);
+  const notFoundQueries = queries.filter(q => !data.results[q] || data.results[q].length === 0);
+
+  let allFoundRecords = [];
+  foundQueries.forEach(query => {
+    allFoundRecords = allFoundRecords.concat(data.results[query]);
+  });
+
+  // Filter logic
+  const filterInput = $id("resultsFilter");
+  const filterText = filterInput ? filterInput.value.toLowerCase() : "";
+  if (filterText) {
+    allFoundRecords = allFoundRecords.filter(r => 
+      (r.name && r.name.toLowerCase().includes(filterText)) ||
+      (r.neoId && r.neoId.toLowerCase().includes(filterText)) ||
+      (r.regNo && r.regNo.toLowerCase().includes(filterText)) ||
+      (r.email && r.email.toLowerCase().includes(filterText))
+    );
+  }
+
+  // Sort logic
+  const sortSelect = $id("sortCgpa");
+  const sortVal = sortSelect ? sortSelect.value : "";
+  if (sortVal) {
+    allFoundRecords.sort((a, b) => {
+      const ca = parseFloat(a.cgpa) || 0;
+      const cb = parseFloat(b.cgpa) || 0;
+      return sortVal === 'desc' ? cb - ca : ca - cb;
+    });
+  }
+
+  // Render Table for Found Records
+  if (allFoundRecords.length > 0) {
+    let tableHtml = `
+      <div style="overflow-x: auto; margin-bottom: 20px;">
+        <table class="results-table" style="width: 100%; border-collapse: collapse; background: var(--card); border-radius: 8px; overflow: hidden; border: 1px solid var(--border);">
+          <thead style="background: rgba(255,255,255,0.05); text-align: left; border-bottom: 1px solid var(--border);">
+            <tr>
+              <th style="padding: 12px 15px;">Name</th>
+              <th style="padding: 12px 15px;">Neo ID</th>
+              <th style="padding: 12px 15px;">Reg No</th>
+              <th style="padding: 12px 15px;">Email</th>
+              <th style="padding: 12px 15px;">CGPA</th>
+              <th style="padding: 12px 15px;">10th/12th</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+
+    allFoundRecords.forEach(r => {
+      const cgpaNum = parseFloat(r.cgpa) || 0;
+      const cgpaColor = cgpaNum >= 8.5 ? '#10b981' : (cgpaNum > 0 ? 'var(--text)' : 'var(--text-muted)');
+      tableHtml += `
+        <tr style="border-bottom: 1px solid var(--border); transition: background 0.2s;">
+          <td style="padding: 12px 15px; font-weight: 600;">${r.name}</td>
+          <td style="padding: 12px 15px; font-family: monospace; color: var(--primary);">${r.neoId || '-'}</td>
+          <td style="padding: 12px 15px;">${r.regNo || '-'}</td>
+          <td style="padding: 12px 15px; font-size: 0.9em; color: var(--text-muted);">${r.email || '-'}</td>
+          <td style="padding: 12px 15px; font-weight: 600; color: ${cgpaColor};">${r.cgpa || '-'}</td>
+          <td style="padding: 12px 15px; font-size: 0.9em; color: var(--text-muted);">
+            ${r.tenth && r.tenth !== '-' ? r.tenth + (r.tenth.includes('%') ? '' : '%') : '-'} / 
+            ${r.twelfth && r.twelfth !== '-' ? r.twelfth + (r.twelfth.includes('%') ? '' : '%') : '-'}
+          </td>
+        </tr>
+      `;
+    });
+
+    tableHtml += `</tbody></table></div>`;
+    $id("resultsContainer").insertAdjacentHTML("beforeend", tableHtml);
+  }
+
+  // Render Not Found
+  if (notFoundQueries.length > 0) {
+    let notFoundHtml = `<div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px;">`;
+    notFoundQueries.forEach(query => {
+      notFoundHtml += `
+        <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); padding: 10px 15px; border-radius: 8px; display: flex; align-items: center; gap: 10px;">
+          <div style="color: #ef4444;">⚠</div>
+          <div>
+            <div style="font-weight: 600; font-size: 0.9em;">No Record Found</div>
+            <div style="font-size: 0.8em; color: var(--text-muted);">${query}</div>
           </div>
-          ${r.cgpa ? `
-          <div class="result-field">
-            <div class="field-label">CGPA</div>
-            <div class="field-value">${r.cgpa}</div>
-          </div>
-          ` : ''}
-          ${r.tenth ? `
-          <div class="result-field">
-            <div class="field-label">10th Marks</div>
-            <div class="field-value">${r.tenth}${r.tenth !== '-' && !r.tenth.includes('%') ? '%' : ''}</div>
-          </div>
-          ` : ''}
-          ${r.twelfth ? `
-          <div class="result-field">
-            <div class="field-label">12th Marks</div>
-            <div class="field-value">${r.twelfth}${r.twelfth !== '-' && !r.twelfth.includes('%') ? '%' : ''}</div>
-          </div>
-          ` : ''}
         </div>
-    </div>
-  `;
-  $id("resultsContainer").insertAdjacentHTML("beforeend", html);
+      `;
+    });
+    notFoundHtml += `</div>`;
+    $id("resultsContainer").insertAdjacentHTML("beforeend", notFoundHtml);
+  }
+
+  // Update Toolbar
+  if ($id("resultsCount") && $id("resultsToolbar")) {
+    $id("resultsCount").textContent = `Found ${allFoundRecords.length} student${allFoundRecords.length !== 1 ? 's' : ''}`;
+    $id("resultsToolbar").classList.remove("hidden");
+  }
 }
 
-// ── Display Not Found ──────────────────────────
-function showNotFound(query) {
-  const html = `
-    <div class="not-found-card">
-      <div class="not-found-icon">⚠</div>
-      <div class="not-found-title">No Record Found</div>
-      <div class="not-found-sub">No student with ID "<span>${query}</span>" exists in the database.</div>
-    </div>
-  `;
-  $id("resultsContainer").insertAdjacentHTML("beforeend", html);
+// Bind Filter & Sort Events
+if ($id("resultsFilter")) {
+  $id("resultsFilter").addEventListener("input", renderSearchResults);
+}
+if ($id("sortCgpa")) {
+  $id("sortCgpa").addEventListener("change", renderSearchResults);
 }
 
 // ── Recent Placements & Stats ──────────────────────────
+let currentBatch = "";
+
 async function loadRecentPlacements() {
   try {
-    const resRecent = await fetch('/api/recent');
-    const resStats = await fetch('/api/stats');
+    const resRecent = await fetch(`/api/recent?batch=${currentBatch}`);
+    const resStats = await fetch(`/api/stats?batch=${currentBatch}`);
     if (resRecent.status === 401 || resStats.status === 401) { window.location.href = '/login.html'; return; }
     if (!resRecent.ok || !resStats.ok) return;
     
@@ -368,6 +401,31 @@ async function loadRecentPlacements() {
   }
 }
 
+// ── Feed Batch Tabs ─────────────────────────────
+if ($id("btnFeedAll") && $id("btnFeed23") && $id("btnFeed22")) {
+  $id("btnFeedAll").addEventListener("click", () => {
+    $id("btnFeedAll").classList.add("active");
+    $id("btnFeed23").classList.remove("active");
+    $id("btnFeed22").classList.remove("active");
+    currentBatch = "";
+    loadRecentPlacements();
+  });
+  $id("btnFeed23").addEventListener("click", () => {
+    $id("btnFeed23").classList.add("active");
+    $id("btnFeedAll").classList.remove("active");
+    $id("btnFeed22").classList.remove("active");
+    currentBatch = "23";
+    loadRecentPlacements();
+  });
+  $id("btnFeed22").addEventListener("click", () => {
+    $id("btnFeed22").classList.add("active");
+    $id("btnFeedAll").classList.remove("active");
+    $id("btnFeed23").classList.remove("active");
+    currentBatch = "22";
+    loadRecentPlacements();
+  });
+}
+
 // ── Helpers ─────────────────────────────────────
 function showStatus(msg, isError = false) {
   $id("statusText").textContent = msg;
@@ -410,35 +468,33 @@ $id("clearBtn").addEventListener("click", () => {
   if($id("resultsToolbar")) $id("resultsToolbar").classList.add("hidden");
 });
 
-if ($id("syncGmailBtn")) {
-  $id("syncGmailBtn").addEventListener("click", () => {
-    const tokenClient = google.accounts.oauth2.initTokenClient({
-      client_id: '715718536052-1e0k29fr1n1156tekg966j1vli7cql30.apps.googleusercontent.com',
-      scope: 'https://www.googleapis.com/auth/gmail.readonly',
-      callback: async (tokenResponse) => {
-        if (tokenResponse && tokenResponse.access_token) {
-          showStatus("Syncing with Gmail...");
-          try {
-            const res = await fetch('/api/sync-gmail', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ accessToken: tokenResponse.access_token })
-            });
-            const data = await res.json();
-            if (data.success) {
-              hideStatus();
-              alert(data.message);
-              loadRecentPlacements();
-            } else {
-              showStatus("Sync Failed: " + (data.error || "Unknown"), true);
-            }
-          } catch (e) {
-            showStatus("Sync Error", true);
-          }
-        }
-      },
-    });
-    tokenClient.requestAccessToken();
+if ($id('syncGmailBtn')) {
+  $id('syncGmailBtn').addEventListener('click', async () => {
+    showStatus('Syncing with Gmail...');
+    try {
+      const res = await fetch('/api/sync-gmail', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (res.status === 403) {
+        showStatus('Access denied: admin only.', true);
+        return;
+      }
+      if (res.status === 503) {
+        showStatus('Gmail not configured — visit /api/auth/gmail-connect first.', true);
+        return;
+      }
+      const data = await res.json();
+      if (data.success) {
+        hideStatus();
+        alert(data.message);
+        loadRecentPlacements();
+      } else {
+        showStatus('Sync Failed: ' + (data.error || 'Unknown'), true);
+      }
+    } catch (e) {
+      showStatus('Sync Error: ' + e.message, true);
+    }
   });
 }
 
@@ -460,3 +516,57 @@ if($id("resultsFilter")) {
 const style = document.createElement("style");
 style.textContent = `@keyframes shake {0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)}} .shake{animation:shake 0.35s ease;}`;
 document.head.appendChild(style);
+
+// ── Admin UI init ───────────────────────────────────────────────────────────
+// Calls /api/me to determine if the current session is admin.
+// Hides the Sync Gmail button for non-admin users.
+// The server-side requireAdmin middleware is the real security gate;
+// this is purely UX — non-admins should not even see the button.
+async function initAdminUI() {
+  const syncBtn = $id('syncGmailBtn');
+  if (!syncBtn) return;
+  // Default: hide until we confirm admin status
+  syncBtn.style.display = 'none';
+  try {
+    const res = await fetch('/api/me');
+    if (!res.ok) return; // unauthenticated — page will redirect to login anyway
+    const { isAdmin } = await res.json();
+    syncBtn.style.display = isAdmin ? '' : 'none';
+
+    if (isAdmin) {
+      // Fetch pending review count and inject badge
+      try {
+        const r     = await fetch('/api/pending-review');
+        const items = r.ok ? await r.json() : [];
+        if (items.length > 0) {
+          const badge = document.createElement('a');
+          badge.href  = '/review.html';
+          badge.id    = 'reviewBadge';
+          badge.title = 'Open admin review portal';
+          badge.style.cssText = [
+            'display:inline-flex;align-items:center;gap:6px',
+            'background:rgba(245,158,11,0.15)',
+            'border:1px solid rgba(245,158,11,0.35)',
+            'color:#f59e0b',
+            'padding:6px 14px',
+            'border-radius:8px',
+            'font-size:0.82rem',
+            'font-weight:600',
+            'text-decoration:none',
+            'margin-left:8px',
+            'cursor:pointer',
+            'transition:background 0.2s'
+          ].join(';');
+          badge.innerHTML = `⚠ Pending Review <span style="background:rgba(245,158,11,0.3);padding:1px 7px;border-radius:20px">${items.length}</span>`;
+          badge.onmouseenter = () => badge.style.background = 'rgba(245,158,11,0.25)';
+          badge.onmouseleave = () => badge.style.background = 'rgba(245,158,11,0.15)';
+          syncBtn.insertAdjacentElement('afterend', badge);
+        }
+      } catch (_) { /* badge is non-critical */ }
+    }
+  } catch (e) {
+    // Fail safe: keep button hidden if /api/me is unreachable
+    syncBtn.style.display = 'none';
+  }
+}
+initAdminUI();

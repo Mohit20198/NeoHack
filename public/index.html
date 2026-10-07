@@ -112,9 +112,16 @@
           <span id="statusText">Loading database...</span>
         </div>
 
-        <div id="resultsToolbar" class="results-toolbar hidden" style="margin-top: 20px; display: flex; justify-content: space-between; align-items: center; background: var(--card); padding: 10px 15px; border-radius: 8px; border: 1px solid var(--border);">
+        <div id="resultsToolbar" class="results-toolbar hidden" style="margin-top: 20px; display: flex; justify-content: space-between; align-items: center; background: var(--card); padding: 10px 15px; border-radius: 8px; border: 1px solid var(--border); flex-wrap: wrap; gap: 10px;">
           <div id="resultsCount" style="font-weight: 600; color: var(--primary);"></div>
-          <input type="text" id="resultsFilter" placeholder="Search within results..." style="padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); width: 250px;">
+          <div style="display: flex; gap: 10px;">
+            <select id="sortCgpa" style="padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text);">
+              <option value="">Sort by CGPA...</option>
+              <option value="desc">Highest to Lowest</option>
+              <option value="asc">Lowest to Highest</option>
+            </select>
+            <input type="text" id="resultsFilter" placeholder="Search within results..." style="padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); width: 250px;">
+          </div>
         </div>
   
         <div id="resultsContainer" class="results-container">
@@ -129,6 +136,12 @@
           <p>Real-time updates of students getting placed.</p>
         </div>
         
+        <div style="display:flex; gap:10px; justify-content:center; margin-bottom:20px;">
+          <button id="btnFeedAll" class="tab-btn active" style="font-size:0.9rem; padding: 8px 16px;">All Batches</button>
+          <button id="btnFeed23" class="tab-btn" style="font-size:0.9rem; padding: 8px 16px;">23 Batch</button>
+          <button id="btnFeed22" class="tab-btn" style="font-size:0.9rem; padding: 8px 16px;">22 Batch</button>
+        </div>
+
         <!-- Recent Placements -->
         <div id="recentPlacementsSection" class="recent-placements-section hidden" style="margin-top:0;">
           <div id="recentPlacementsList" class="recent-list" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px;">
@@ -236,7 +249,7 @@
     </footer>
   </div>
 
-  <script src="/app.js"></script>
+  <script src="/app.js?v=2"></script>
   <script>
     document.getElementById('logoutBtn').addEventListener('click', async () => {
       await fetch('/api/auth/logout', { method: 'POST' });

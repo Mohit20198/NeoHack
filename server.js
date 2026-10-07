@@ -255,11 +255,19 @@ app.get('/api/companies', async (req, res) => {
 
 // API endpoint for comprehensive branch stats
 app.get('/api/stats', async (req, res) => {
-  const placements = await Placement.find().sort({ timestamp: -1 }).lean();
+  const batchFilter = req.query.batch;
+  let placements = await Placement.find().sort({ timestamp: -1 }).lean();
+  let studentsToConsider = Object.values(database);
+  
+  if (batchFilter) {
+    placements = placements.filter(p => p.regNo && p.regNo.startsWith(batchFilter));
+    studentsToConsider = studentsToConsider.filter(s => s.regNo && s.regNo.startsWith(batchFilter));
+  }
+  
   const placedNeoIds = new Set(placements.map(p => p.neoId));
-    const branchStats = {};
-    
-    Object.values(database).forEach(student => {
+  const branchStats = {};
+  
+  studentsToConsider.forEach(student => {
       const match = student.regNo.match(/[0-9]{2}([A-Z]+)[0-9]+/);
       const branch = match ? match[1] : "OTHER";
       
@@ -348,7 +356,6 @@ app.get('/api/stats', async (req, res) => {
         : ((numericPackages[mid - 1] + numericPackages[mid]) / 2).toFixed(2);
   }
 
-  // Calculate CGPA Stats
   const cgpaStats = {
     '9-10': { placed: 0, unplaced: 0 },
     '8-9': { placed: 0, unplaced: 0 },
@@ -358,7 +365,7 @@ app.get('/api/stats', async (req, res) => {
     'Unknown': { placed: 0, unplaced: 0 }
   };
 
-  Object.values(database).forEach(student => {
+  studentsToConsider.forEach(student => {
     let bin = 'Unknown';
     if (student.cgpa) {
       const gpa = parseFloat(student.cgpa);
@@ -379,7 +386,7 @@ app.get('/api/stats', async (req, res) => {
   });
 
   res.json({
-    totalStudents: Object.keys(database).length,
+    totalStudents: studentsToConsider.length,
     totalPlaced: placedNeoIds.size,
     branchStats,
     companyStats,
@@ -394,7 +401,12 @@ app.get('/api/stats', async (req, res) => {
 
 // API endpoint for recent placements
 app.get('/api/recent', requireAuth, async (req, res) => {
-  const placements = await Placement.find().sort({ timestamp: -1 }).lean();
+  const batchFilter = req.query.batch;
+  let placements = await Placement.find().sort({ timestamp: -1 }).lean();
+  
+  if (batchFilter) {
+    placements = placements.filter(p => p.regNo && p.regNo.startsWith(batchFilter));
+  }
   
   // Calculate company stats
   const companyStats = {};
