@@ -546,13 +546,19 @@ app.get('/api/recent', requireAuth, async (req, res) => {
   const batchFilter = req.query.batch;
   let placements = await Placement.find().sort({ timestamp: -1 }).lean();
   
+  // Enrich every placement with regNo from CSV database
+  placements = placements.map(p => {
+    const key = (p.neoId || '').toUpperCase();
+    const student = database[key];
+    if (student && student.regNo) {
+      p.regNo = student.regNo;
+    }
+    return p;
+  });
+  
+  // Now filter by regNo prefix
   if (batchFilter) {
-    placements = placements.filter(p => {
-      const key = (p.neoId || '').toUpperCase();
-      const student = database[key];
-      const actualRegNo = student ? student.regNo : p.regNo;
-      return actualRegNo && actualRegNo.startsWith(batchFilter);
-    });
+    placements = placements.filter(p => p.regNo && p.regNo.startsWith(batchFilter));
   }
   
   // Calculate company stats

@@ -384,17 +384,22 @@ async function loadRecentPlacements() {
       
       placements.forEach(p => {
         const date = new Date(p.timestamp).toLocaleDateString();
+        const regInfo = p.regNo ? ` · ${p.regNo}` : '';
         const html = `
           <div class="recent-item">
             <div class="recent-avatar">★</div>
             <div class="recent-details">
-              <strong>${p.name}</strong> (${p.neoId}) placed at <strong>${p.source}</strong>!<br/>
+              <strong>${p.name}</strong> (${p.neoId}${regInfo}) placed at <strong>${p.source}</strong>!<br/>
               <small>Package: <strong>${p.packageCTC || 'Undisclosed'}</strong> · ${date}</small>
             </div>
           </div>
         `;
         list.insertAdjacentHTML("beforeend", html);
       });
+    } else if (batchFilter) {
+      $id("recentPlacementsSection").classList.remove("hidden");
+      const list = $id("recentPlacementsList");
+      list.innerHTML = `<div style="text-align:center;padding:20px;color:var(--text-muted);">No placed students found for batch ${currentBatch}</div>`;
     }
   } catch (err) {
     console.error("Failed to load recent placements and stats:", err);
