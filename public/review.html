@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Review Portal — NeoHack</title>
+  <meta name="description" content="Admin review queue for unconfirmed CDC placement emails." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg:        #0d0f1a;
+      --surface:   #131626;
+      --surface2:  #1a1d30;
+      --border:    rgba(255,255,255,0.08);
+      --text:      #e2e8f0;
+      --muted:     #64748b;
+      --accent:    #818cf8;
+      --accent2:   #c084fc;
+      --green:     #10b981;
+      --red:       #ef4444;
+      --yellow:    #f59e0b;
+      --radius:    12px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+    }
+
+    /* Background blobs */
+    .blob { position: fixed; border-radius: 50%; filter: blur(80px); opacity: 0.12; pointer-events: none; z-index: 0; }
+    .blob-1 { width: 500px; height: 500px; background: var(--accent);  top: -100px; left: -100px; }
+    .blob-2 { width: 400px; height: 400px; background: var(--accent2); bottom: -80px; right: -80px; }
+
+    /* Layout */
+    .page { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 0 24px 60px; }
+
+    /* Header */
+    .header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 20px 0 28px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 32px;
+    }
+    .header-left { display: flex; align-items: center; gap: 14px; }
+    .logo-icon {
+      width: 36px; height: 36px; border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+    .logo-text { font-size: 1.1rem; font-weight: 700; }
+    .logo-sub  { color: var(--muted); font-size: 0.85rem; margin-left: 4px; }
+    .back-btn {
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); padding: 8px 16px; border-radius: 8px;
+      cursor: pointer; font-size: 0.85rem; font-weight: 500;
+      text-decoration: none; display: flex; align-items: center; gap: 6px;
+      transition: background 0.2s;
+    }
+    .back-btn:hover { background: var(--surface); }
+
+    /* Stats bar */
+    .stats-row { display: flex; gap: 16px; margin-bottom: 28px; flex-wrap: wrap; }
+    .stat-card {
+      flex: 1; min-width: 140px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 18px 20px;
+    }
+    .stat-card .num { font-size: 2rem; font-weight: 800; line-height: 1; }
+    .stat-card .label { color: var(--muted); font-size: 0.78rem; margin-top: 6px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+    .stat-card.pending .num  { color: var(--yellow); }
+    .stat-card.approved .num { color: var(--green); }
+    .stat-card.rejected .num { color: var(--red); }
+
+    /* Section heading */
+    .section-head {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .section-title { font-size: 1rem; font-weight: 600; }
+    .refresh-btn {
+      background: transparent; border: 1px solid var(--border);
+      color: var(--muted); padding: 6px 12px; border-radius: 8px;
+      cursor: pointer; font-size: 0.8rem; transition: all 0.2s;
+    }
+    .refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* Table */
+    .table-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    thead { background: var(--surface2); }
+    th { padding: 12px 14px; text-align: left; font-weight: 600; color: var(--muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
+    td { padding: 14px 14px; border-top: 1px solid var(--border); vertical-align: top; }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+
+    .mono { font-family: 'Space Mono', monospace; font-size: 0.82rem; }
+    .subject-cell { max-width: 260px; word-break: break-word; color: var(--muted); font-size: 0.82rem; }
+
+    /* Source badge */
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 20px;
+      font-size: 0.72rem; font-weight: 600; white-space: nowrap;
+    }
+    .badge-groq-medium { background: rgba(245,158,11,0.15); color: var(--yellow); border: 1px solid rgba(245,158,11,0.3); }
+    .badge-groq-low    { background: rgba(239,68,68,0.15);  color: var(--red);    border: 1px solid rgba(239,68,68,0.3); }
+    .badge-groq-high   { background: rgba(16,185,129,0.15); color: var(--green);  border: 1px solid rgba(16,185,129,0.3); }
+
+    /* Action buttons */
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn {
+      padding: 6px 14px; border-radius: 8px; font-size: 0.8rem; font-weight: 600;
+      cursor: pointer; border: none; transition: all 0.2s; white-space: nowrap;
+    }
+    .btn-approve { background: rgba(16,185,129,0.15); color: var(--green); border: 1px solid rgba(16,185,129,0.3); }
+    .btn-approve:hover { background: var(--green); color: #fff; }
+    .btn-reject  { background: rgba(239,68,68,0.15);  color: var(--red);   border: 1px solid rgba(239,68,68,0.3); }
+    .btn-reject:hover  { background: var(--red);   color: #fff; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Empty state */
+    .empty {
+      text-align: center; padding: 60px 20px;
+      color: var(--muted);
+    }
+    .empty .icon { font-size: 3rem; margin-bottom: 12px; }
+    .empty .msg  { font-size: 1rem; font-weight: 500; }
+    .empty .sub  { font-size: 0.85rem; margin-top: 6px; }
+
+    /* Loading */
+    .loading { text-align: center; padding: 60px; color: var(--muted); }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      width: 32px; height: 32px; border: 3px solid var(--border);
+      border-top-color: var(--accent); border-radius: 50%;
+      animation: spin 0.8s linear infinite; margin: 0 auto 12px;
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 999; backdrop-filter: blur(4px);
+      opacity: 0; pointer-events: none; transition: opacity 0.2s;
+    }
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+    .modal {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 16px; padding: 28px; width: 100%; max-width: 420px;
+      transform: scale(0.95); transition: transform 0.2s;
+    }
+    .modal-overlay.open .modal { transform: scale(1); }
+    .modal h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 6px; }
+    .modal p  { color: var(--muted); font-size: 0.85rem; margin-bottom: 16px; }
+    .modal textarea {
+      width: 100%; background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); border-radius: 8px; padding: 10px 12px;
+      font-family: 'Inter', sans-serif; font-size: 0.88rem; resize: vertical;
+      min-height: 80px; outline: none;
+    }
+    .modal textarea:focus { border-color: var(--accent); }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+    .btn-cancel { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+    .btn-cancel:hover { border-color: var(--muted); }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: 24px; right: 24px;
+      background: var(--surface); border: 1px solid var(--border);
+      padding: 12px 18px; border-radius: 10px; font-size: 0.88rem;
+      z-index: 9999; transform: translateY(80px); opacity: 0;
+      transition: all 0.3s; max-width: 320px;
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast.success { border-color: rgba(16,185,129,0.4); color: var(--green); }
+    .toast.error   { border-color: rgba(239,68,68,0.4);  color: var(--red); }
+  </style>
+</head>
+<body>
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+
+  <div class="page">
+    <header class="header">
+      <div class="header-left">
+        <div class="logo-icon">🔍</div>
+        <div>
+          <span class="logo-text">Admin Review Portal</span>
+          <span class="logo-sub">— NeoHack</span>
+        </div>
+      </div>
+      <a href="/" class="back-btn">← Dashboard</a>
+    </header>
+
+    <div class="stats-row" id="statsRow">
+      <div class="stat-card pending">
+        <div class="num" id="statPending">—</div>
+        <div class="label">Pending Review</div>
+      </div>
+      <div class="stat-card approved">
+        <div class="num" id="statApproved">—</div>
+        <div class="label">Approved (all time)</div>
+      </div>
+      <div class="stat-card rejected">
+        <div class="num" id="statRejected">—</div>
+        <div class="label">Rejected (all time)</div>
+      </div>
+    </div>
+
+    <div class="section-head">
+      <div class="section-title">Pending Review Queue</div>
+      <button class="refresh-btn" id="refreshBtn">↻ Refresh</button>
+    </div>
+
+    <div id="tableContainer">
+      <div class="loading"><div class="spinner"></div>Loading queue…</div>
+    </div>
+  </div>
+
+  <!-- Reject reason modal -->
+  <div class="modal-overlay" id="rejectModal">
+    <div class="modal">
+      <h3>Reject this record?</h3>
+      <p>This will permanently mark the entry as rejected and it will never be written to Placement. Optionally add a reason for the audit trail.</p>
+      <textarea id="rejectReason" placeholder="Reason (optional)…"></textarea>
+      <div class="modal-actions">
+        <button class="btn btn-cancel" id="cancelReject">Cancel</button>
+        <button class="btn btn-reject" id="confirmReject">Reject</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="review.js"></script>
+</body>
+</html>

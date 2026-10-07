@@ -568,5 +568,43 @@ async function initAdminUI() {
     // Fail safe: keep button hidden if /api/me is unreachable
     syncBtn.style.display = 'none';
   }
+
+  // Bind manual sync logic
+  syncBtn.addEventListener('click', async () => {
+    const originalText = syncBtn.innerHTML;
+    syncBtn.innerHTML = `
+      <svg style="width:16px;height:16px;margin-right:6px; animation: spin 1s linear infinite;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
+      Syncing...
+    `;
+    syncBtn.disabled = true;
+    syncBtn.style.opacity = '0.7';
+    
+    try {
+      const res = await fetch('/api/sync/manual', { method: 'POST' });
+      const data = await res.json();
+      
+      if (res.ok) {
+        showStatus('Sync completed successfully!', false);
+        setTimeout(() => location.reload(), 1500);
+      } else {
+        if (res.status === 400 && data.error.includes('auth not configured')) {
+           window.location.href = '/api/auth/gmail-connect';
+        } else {
+           showStatus('Sync failed: ' + data.error, true);
+        }
+      }
+    } catch (e) {
+      showStatus('Network error during sync', true);
+    } finally {
+      syncBtn.innerHTML = originalText;
+      syncBtn.disabled = false;
+      syncBtn.style.opacity = '1';
+    }
+  });
 }
 initAdminUI();
+
+// Add global spin animation for the sync button loader
+const spinStyle = document.createElement("style");
+spinStyle.textContent = `@keyframes spin { 100% { transform: rotate(360deg); } }`;
+document.head.appendChild(spinStyle);

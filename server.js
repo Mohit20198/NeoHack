@@ -1,24 +1,54 @@
 require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const fs = require('fs');
-const path = require('path');
+const express    = require('express');
+const cors       = require('cors');
+const fs         = require('fs');
+const path       = require('path');
 const cookieParser = require('cookie-parser');
 const { OAuth2Client } = require('google-auth-library');
 const { google } = require('googleapis');
-const jwt = require('jsonwebtoken');
-const mongoose = require('mongoose');
+const jwt        = require('jsonwebtoken');
+const mongoose   = require('mongoose');
+const cron       = require('node-cron');
 
-const GOOGLE_CLIENT_ID = '715718536052-1e0k29fr1n1156tekg966j1vli7cql30.apps.googleusercontent.com';
-const JWT_SECRET = 'neohack-super-secret-key-2026';
-const client = new OAuth2Client(GOOGLE_CLIENT_ID);
+// Verify Google ID tokens for login
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-const Placement = require('./models/Placement');
-const Company = require('./models/Company');
+const Placement    = require('./models/Placement');
+const Company      = require('./models/Company');
+const GmailToken   = require('./models/GmailToken');
+const SyncLog      = require('./models/SyncLog');
+const PendingReview = require('./models/PendingReview');
+const { runGmailSync } = require('./gmailSync');
+const gmailAuthRouter  = require('./routes/gmailAuth');
 
-mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/neohack")
-  .then(() => console.log("Connected to MongoDB!"))
-  .catch(err => console.error("MongoDB Connection Error:", err));
+// Module-level OAuth client for background sync ΓÇö populated by initSyncAuth()
+let syncAuth = null;
+
+async function initSyncAuth() {
+  try {
+    const tokenDoc = await GmailToken.findOne();
+    if (tokenDoc && tokenDoc.refreshToken) {
+      syncAuth = new OAuth2Client(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET,
+        process.env.GMAIL_REDIRECT_URI || 'http://localhost:3000/api/auth/gmail-callback'
+      );
+      syncAuth.setCredentials({ refresh_token: tokenDoc.refreshToken });
+      console.log('[SYNC] Gmail auth initialized from stored token.');
+    } else {
+      console.log('[SYNC] No stored Gmail token. Visit /api/auth/gmail-connect to authorize.');
+    }
+  } catch (err) {
+    console.error('[SYNC] Failed to initialize Gmail auth:', err.message);
+  }
+}
+
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/neohack')
+  .then(async () => {
+    console.log('Connected to MongoDB!');
+    await initSyncAuth();
+  })
+  .catch(err => console.error('MongoDB Connection Error:', err));
 
 async function addPlacement(record, companyName, emailDate, packageCTC) {
   const existing = await Placement.findOne({ neoId: record.neoId });
@@ -79,7 +109,24 @@ function requireAuth(req, res, next) {
   const token = req.cookies.session;
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
   try {
-    jwt.verify(token, JWT_SECRET);
+    req.user = jwt.verify(token, process.env.JWT_SECRET);
+    next();
+  } catch(e) {
+    res.status(401).json({ error: 'Invalid session' });
+  }
+}
+
+// requireAdmin ΓÇö authenticated AND isAdmin:true in JWT.
+// Returns 403 (not 401) for logged-in non-admin users.
+function requireAdmin(req, res, next) {
+  const token = req.cookies.session;
+  if (!token) return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (!decoded.isAdmin) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    req.user = decoded;
     next();
   } catch(e) {
     res.status(401).json({ error: 'Invalid session' });
@@ -90,7 +137,23 @@ function requirePageAuth(req, res, next) {
   const token = req.cookies.session;
   if (!token) return res.redirect('/login.html');
   try {
-    jwt.verify(token, JWT_SECRET);
+    jwt.verify(token, process.env.JWT_SECRET);
+    next();
+  } catch(e) {
+    res.redirect('/login.html');
+  }
+}
+
+// requireAdminPage ΓÇö like requireAdmin but redirects instead of returning JSON
+function requireAdminPage(req, res, next) {
+  const token = req.cookies.session;
+  if (!token) return res.redirect('/login.html');
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (!decoded.isAdmin) {
+      return res.redirect('/');
+    }
+    req.user = decoded;
     next();
   } catch(e) {
     res.redirect('/login.html');
@@ -103,7 +166,7 @@ app.post('/api/auth/google', async (req, res) => {
   try {
     const ticket = await client.verifyIdToken({
       idToken: token,
-      audience: GOOGLE_CLIENT_ID,
+      audience: process.env.GOOGLE_CLIENT_ID,
     });
     const payload = ticket.getPayload();
     const email = payload.email.toLowerCase();
@@ -111,8 +174,13 @@ app.post('/api/auth/google', async (req, res) => {
     const approved = getApprovedEmails().map(e => e.toLowerCase());
     
     if (approved.includes(email)) {
-      const sessionToken = jwt.sign({ email }, JWT_SECRET, { expiresIn: '24h' });
-      res.cookie('session', sessionToken, { httpOnly: true, secure: false }); 
+      // isAdmin derived server-side ΓÇö never trust any flag from the client
+      const isAdmin = (email === (process.env.ADMIN_EMAIL || '').toLowerCase());
+      const sessionToken = jwt.sign({ email, isAdmin }, process.env.JWT_SECRET, { expiresIn: '24h' });
+      res.cookie('session', sessionToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production'
+      });
       res.json({ success: true });
     } else {
       res.status(403).json({ error: 'Access denied: Email not approved by admin.' });
@@ -126,6 +194,45 @@ app.post('/api/auth/logout', (req, res) => {
   res.clearCookie('session');
   res.json({ success: true });
 });
+
+app.get('/api/user', requireAuth, (req, res) => {
+  res.json({ email: req.user.email, isAdmin: req.user.isAdmin });
+});
+
+app.post('/api/sync/manual', requireAuth, async (req, res) => {
+  // Only allow mohit.23bai10262
+  if (!req.user.email.toLowerCase().includes('mohit.23bai10262')) {
+    return res.status(403).json({ error: 'Only mohit.23bai10262 can trigger manual sync.' });
+  }
+  
+  if (!syncAuth) {
+    return res.status(400).json({ error: 'Gmail auth not configured. Visit /api/auth/gmail-connect.' });
+  }
+
+  try {
+    await runGmailSync(syncAuth, database, regDatabase, nameDatabase);
+    res.json({ success: true, message: 'Sync completed successfully!' });
+  } catch (error) {
+    console.error('Manual sync failed:', error);
+    res.status(500).json({ error: 'Manual sync failed: ' + error.message });
+  }
+});
+
+// /api/me ΓÇö returns current session email + isAdmin flag.
+// Used by the frontend to conditionally render admin-only UI.
+app.get('/api/me', requireAuth, (req, res) => {
+  res.json({ email: req.user.email, isAdmin: req.user.isAdmin || false });
+});
+
+// /api/health ΓÇö public keepalive endpoint.
+// Ping this from UptimeRobot / cron-job.org every 10 min to prevent
+// Render free-tier from spinning down the instance (which would kill the cron).
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', uptime: process.uptime() });
+});
+
+// Gmail OAuth routes (connect + callback)
+app.use('/api/auth', gmailAuthRouter);
 
 // In-memory database
 let database = {}; // Neo ID -> record
@@ -254,8 +361,9 @@ app.get('/api/companies', async (req, res) => {
 });
 
 // API endpoint for comprehensive branch stats
-app.get('/api/stats', async (req, res) => {
+app.get('/api/stats', requireAuth, async (req, res) => {
   const batchFilter = req.query.batch;
+  
   let placements = await Placement.find().sort({ timestamp: -1 }).lean();
   let studentsToConsider = Object.values(database);
   
@@ -265,9 +373,9 @@ app.get('/api/stats', async (req, res) => {
   }
   
   const placedNeoIds = new Set(placements.map(p => p.neoId));
-  const branchStats = {};
-  
-  studentsToConsider.forEach(student => {
+    const branchStats = {};
+    
+    studentsToConsider.forEach(student => {
       const match = student.regNo.match(/[0-9]{2}([A-Z]+)[0-9]+/);
       const branch = match ? match[1] : "OTHER";
       
@@ -423,7 +531,7 @@ app.get('/api/recent', requireAuth, async (req, res) => {
   });
 });
 
-const NEOHACK_API_KEY = "admin_secret_9942";
+const NEOHACK_API_KEY = process.env.NEOHACK_API_KEY || 'admin_secret_9942';
 
 app.post('/api/add-company', async (req, res) => {
   const apiKey = req.headers['x-api-key'];
@@ -530,9 +638,11 @@ app.post('/api/add-placement', async (req, res) => {
   }
   
   // Track Total VIT Placements in Company
+  // $inc (not $set) ΓÇö accumulate across calls rather than overwriting.
+  // The overlap guard in gmailSync.js prevents double-counting from cron.
   await Company.findOneAndUpdate(
     { name: finalCompanyName },
-    { $set: { totalVitPlaced: possibleIds.length } },
+    { $inc: { totalVitPlaced: possibleIds.length } },
     { upsert: true }
   );
 
@@ -607,127 +717,133 @@ app.post('/api/add-placement', async (req, res) => {
 
 // Protect index.html
 app.get('/', requirePageAuth, (req, res) => {
-  res.sendFile(path.join(__dirname, 'public/index.html'));
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 app.get('/index.html', requirePageAuth, (req, res) => {
-  res.sendFile(path.join(__dirname, 'public/index.html'));
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+app.get('/review.html', requireAdminPage, (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'review.html'));
 });
 
-app.post('/api/sync-gmail', requireAuth, async (req, res) => {
-  const { accessToken } = req.body;
-  if (!accessToken) return res.status(400).json({ error: "No access token provided" });
-
+// POST /api/sync-gmail ΓÇö admin only manual trigger.
+// The background cron calls runGmailSync directly; this endpoint is an
+// admin escape hatch for on-demand syncs.
+app.post('/api/sync-gmail', requireAdmin, async (req, res) => {
   try {
-    const auth = new OAuth2Client(GOOGLE_CLIENT_ID);
-    auth.setCredentials({ access_token: accessToken });
-    const gmail = google.gmail({ version: 'v1', auth });
-
-    // Fetch messages from noreply.cdcinfo@vit.ac.in, cdc@vitbhopal.ac.in, or vitlions2027@vitbhopal.ac.in
-    const query = '(from:noreply.cdcinfo@vit.ac.in OR from:cdc@vitbhopal.ac.in OR from:vitlions2027@vitbhopal.ac.in) subject:"Congratulations"';
-    const response = await gmail.users.messages.list({ userId: 'me', q: query, maxResults: 50 });
-    
-    if (!response.data.messages) {
-      return res.json({ success: true, message: "No new CDC emails found." });
-    }
-
-    let totalTracked = 0;
-    const existingCompanies = await Company.find().lean();
-    existingCompanies.sort((a, b) => a.name.length - b.name.length);
-
-    for (const msg of response.data.messages) {
-      const msgData = await gmail.users.messages.get({ userId: 'me', id: msg.id, format: 'full' });
-      const payload = msgData.data.payload;
-      
-      let subject = "Unknown";
-      let dateHeader = null;
-      payload.headers.forEach(h => {
-        if (h.name.toLowerCase() === 'subject') subject = h.value;
-        if (h.name.toLowerCase() === 'date') dateHeader = h.value;
+    if (!syncAuth) {
+      return res.status(503).json({
+        error: 'Gmail sync not configured. Visit /api/auth/gmail-connect to authorize.'
       });
-
-      const emailDate = dateHeader ? new Date(dateHeader) : new Date();
-
-      // Extract raw body
-      let rawBody = "";
-      if (payload.parts) {
-        const textPart = payload.parts.find(p => p.mimeType === 'text/plain');
-        if (textPart && textPart.body && textPart.body.data) {
-          rawBody = Buffer.from(textPart.body.data, 'base64').toString('utf8');
-        } else if (payload.parts[0] && payload.parts[0].body && payload.parts[0].body.data) {
-          rawBody = Buffer.from(payload.parts[0].body.data, 'base64').toString('utf8');
-        }
-      } else if (payload.body && payload.body.data) {
-        rawBody = Buffer.from(payload.body.data, 'base64').toString('utf8');
-      }
-
-      // 1. Extract Company Name from Subject
-      const companyMatch = subject.match(/Congratulations\s*!!\s*(.*?)\s+(?:Super|Dream|Internship|Selection|Placement|Offer)/i);
-      let extractedCompanyName = companyMatch ? companyMatch[1].trim() : subject;
-
-      // Clean up company name with existing companies
-      let finalCompanyName = extractedCompanyName;
-      const matchedCompany = existingCompanies.find(c => {
-        const cNameLower = c.name.toLowerCase();
-        const emailLower = finalCompanyName.toLowerCase();
-        return emailLower.includes(cNameLower) || cNameLower.includes(emailLower);
-      });
-      if (matchedCompany) finalCompanyName = matchedCompany.name;
-
-      // Mark Hiring Status as Done in DB
-      await Company.findOneAndUpdate(
-        { name: finalCompanyName },
-        { $set: { hiringDone: true } },
-        { upsert: true }
-      );
-
-      // 2. Extract Neo IDs from body
-      const regex = /\b(?![A-Za-z]+\b)(?!\d+\b)[A-Z0-9]{8,10}\b/g;
-      const matches = rawBody.match(regex) || [];
-      const possibleIds = [...new Set(matches)];
-      
-      if (possibleIds.length === 0) continue;
-
-      let addedForThisCompany = 0;
-      for (let id of possibleIds) {
-        const queryId = id.toUpperCase();
-        let foundRecord = database[queryId] || regDatabase[queryId];
-        
-        if (!foundRecord) {
-          let minDistance = Infinity;
-          let bestMatch = null;
-          for (const neoId of Object.keys(database)) {
-            const dist = levenshtein(queryId, neoId);
-            if (dist < minDistance) {
-              minDistance = dist;
-              bestMatch = neoId;
-            }
-          }
-          if (minDistance <= 2 && bestMatch) {
-            foundRecord = database[bestMatch];
-          }
-        }
-
-        if (foundRecord) {
-          const added = await addPlacement(foundRecord, finalCompanyName, emailDate, "Undisclosed");
-          if (added) {
-            addedForThisCompany++;
-            totalTracked++;
-          }
-        }
-      }
-
-      if (addedForThisCompany > 0) {
-        await Company.findOneAndUpdate(
-          { name: finalCompanyName },
-          { $inc: { totalVitPlaced: addedForThisCompany } }
-        );
-      }
     }
-
-    res.json({ success: true, message: `Synced successfully! Tracked ${totalTracked} new placements.` });
+    const result = await runGmailSync(syncAuth, database, regDatabase, nameDatabase);
+    if (result === null) {
+      return res.json({ success: true, message: 'Sync already in progress ΓÇö skipping.' });
+    }
+    res.json({
+      success: true,
+      message: `Synced! ${result.newPlacements} new placements from ${result.emailsScanned} emails scanned.`
+    });
   } catch (error) {
-    console.error("Gmail API Error:", error);
-    res.status(500).json({ error: "Failed to sync with Gmail." });
+    console.error('Gmail Sync Error:', error);
+    res.status(500).json({ error: 'Failed to sync with Gmail.' });
+  }
+});
+
+// GET /api/sync-logs ΓÇö admin only; last 20 cron run records.
+app.get('/api/sync-logs', requireAdmin, async (req, res) => {
+  try {
+    const logs = await SyncLog.find().sort({ startedAt: -1 }).limit(20).lean();
+    res.json(logs);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch sync logs.' });
+  }
+});
+
+// ΓöÇΓöÇ Admin Review Queue ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+
+// GET /api/pending-review ΓÇö unreviewed items, newest first
+app.get('/api/pending-review', requireAdmin, async (req, res) => {
+  try {
+    const items = await PendingReview.find({ reviewed: false })
+      .sort({ timestamp: -1 })
+      .lean();
+    res.json(items);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch review queue.' });
+  }
+});
+
+// POST /api/pending-review/:id/approve
+// Dedup check ΓåÆ write to Placement ΓåÆ mark reviewed:true, decision:'approved'
+app.post('/api/pending-review/:id/approve', requireAdmin, async (req, res) => {
+  try {
+    const item = await PendingReview.findById(req.params.id);
+    if (!item) return res.status(404).json({ error: 'Review item not found.' });
+    if (item.reviewed) return res.status(409).json({ error: 'Already reviewed.' });
+
+    let placementCreated = false;
+
+    if (item.neoId) {
+      // Dedup ΓÇö skip if already placed
+      const existing = await Placement.findOne({ neoId: item.neoId });
+      if (!existing) {
+        await Placement.create({
+          name:       item.name,
+          neoId:      item.neoId,
+          source:     item.extractedCompanyName || 'Unknown Company',
+          packageCTC: item.extractedCTC         || 'Undisclosed',
+          timestamp:  item.timestamp
+        });
+
+        if (item.extractedCompanyName) {
+          await Company.findOneAndUpdate(
+            { name: item.extractedCompanyName },
+            { $inc: { totalVitPlaced: 1 }, $set: { hiringDone: true } },
+            { upsert: true }
+          );
+        }
+        placementCreated = true;
+        console.log(`[REVIEW] Approved: ${item.name} (${item.neoId}) ΓåÆ ${item.extractedCompanyName}`);
+      } else {
+        console.log(`[REVIEW] Approved but already placed: ${item.neoId} ΓÇö skipping Placement write.`);
+      }
+    }
+
+    await PendingReview.findByIdAndUpdate(req.params.id, {
+      reviewed:  true,
+      decision:  'approved',
+      decidedAt: new Date()
+    });
+
+    res.json({ success: true, placementCreated });
+  } catch (err) {
+    console.error('[REVIEW] Approve error:', err.message);
+    res.status(500).json({ error: 'Failed to approve review item.' });
+  }
+});
+
+// POST /api/pending-review/:id/reject
+// Marks reviewed:true, decision:'rejected' ΓÇö never writes to Placement
+app.post('/api/pending-review/:id/reject', requireAdmin, async (req, res) => {
+  try {
+    const { reason } = req.body;
+    const item = await PendingReview.findById(req.params.id);
+    if (!item) return res.status(404).json({ error: 'Review item not found.' });
+    if (item.reviewed) return res.status(409).json({ error: 'Already reviewed.' });
+
+    await PendingReview.findByIdAndUpdate(req.params.id, {
+      reviewed:  true,
+      decision:  'rejected',
+      reason:    reason || null,
+      decidedAt: new Date()
+    });
+
+    console.log(`[REVIEW] Rejected: ${item.neoId || 'no-id'} | reason: ${reason || 'none'}`);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[REVIEW] Reject error:', err.message);
+    res.status(500).json({ error: 'Failed to reject review item.' });
   }
 });
 
