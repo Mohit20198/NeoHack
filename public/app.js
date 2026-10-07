@@ -540,7 +540,13 @@ async function initAdminUI() {
     const res = await fetch('/api/me');
     if (!res.ok) return; // unauthenticated — page will redirect to login anyway
     const { isAdmin } = await res.json();
-    syncBtn.style.display = isAdmin ? '' : 'none';
+    if (isAdmin) {
+      syncBtn.style.display = '';
+      syncBtn.classList.remove('hidden');
+    } else {
+      syncBtn.style.display = 'none';
+      syncBtn.classList.add('hidden');
+    }
 
     if (isAdmin) {
       // Fetch pending review count and inject badge
