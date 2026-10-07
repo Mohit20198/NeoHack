@@ -11,7 +11,7 @@ const mongoose   = require('mongoose');
 const cron       = require('node-cron');
 
 // Verify Google ID tokens for login
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const client = new OAuth2Client((process.env.GOOGLE_CLIENT_ID || '715718536052-1e0k29fr1n1156tekg966j1vli7cql30.apps.googleusercontent.com'));
 
 const Placement    = require('./models/Placement');
 const Company      = require('./models/Company');
@@ -29,7 +29,7 @@ async function initSyncAuth() {
     const tokenDoc = await GmailToken.findOne();
     if (tokenDoc && tokenDoc.refreshToken) {
       syncAuth = new OAuth2Client(
-        process.env.GOOGLE_CLIENT_ID,
+        (process.env.GOOGLE_CLIENT_ID || '715718536052-1e0k29fr1n1156tekg966j1vli7cql30.apps.googleusercontent.com'),
         process.env.GOOGLE_CLIENT_SECRET,
         process.env.GMAIL_REDIRECT_URI || 'http://localhost:3000/api/auth/gmail-callback'
       );
@@ -109,7 +109,7 @@ function requireAuth(req, res, next) {
   const token = req.cookies.session;
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
   try {
-    req.user = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = jwt.verify(token, (process.env.JWT_SECRET || 'neohack-super-secret-key-2026'));
     next();
   } catch(e) {
     res.status(401).json({ error: 'Invalid session' });
@@ -122,7 +122,7 @@ function requireAdmin(req, res, next) {
   const token = req.cookies.session;
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, (process.env.JWT_SECRET || 'neohack-super-secret-key-2026'));
     if (!decoded.isAdmin) {
       return res.status(403).json({ error: 'Forbidden' });
     }
@@ -137,7 +137,7 @@ function requirePageAuth(req, res, next) {
   const token = req.cookies.session;
   if (!token) return res.redirect('/login.html');
   try {
-    jwt.verify(token, process.env.JWT_SECRET);
+    jwt.verify(token, (process.env.JWT_SECRET || 'neohack-super-secret-key-2026'));
     next();
   } catch(e) {
     res.redirect('/login.html');
@@ -149,7 +149,7 @@ function requireAdminPage(req, res, next) {
   const token = req.cookies.session;
   if (!token) return res.redirect('/login.html');
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, (process.env.JWT_SECRET || 'neohack-super-secret-key-2026'));
     if (!decoded.isAdmin) {
       return res.redirect('/');
     }
@@ -166,7 +166,7 @@ app.post('/api/auth/google', async (req, res) => {
   try {
     const ticket = await client.verifyIdToken({
       idToken: token,
-      audience: process.env.GOOGLE_CLIENT_ID,
+      audience: (process.env.GOOGLE_CLIENT_ID || '715718536052-1e0k29fr1n1156tekg966j1vli7cql30.apps.googleusercontent.com') || '715718536052-1e0k29fr1n1156tekg966j1vli7cql30.apps.googleusercontent.com',
     });
     const payload = ticket.getPayload();
     const email = payload.email.toLowerCase();
@@ -174,9 +174,9 @@ app.post('/api/auth/google', async (req, res) => {
     const approved = getApprovedEmails().map(e => e.toLowerCase());
     
     if (approved.includes(email)) {
-      // isAdmin derived server-side ΓÇö never trust any flag from the client
-      const isAdmin = (email === (process.env.ADMIN_EMAIL || '').toLowerCase());
-      const sessionToken = jwt.sign({ email, isAdmin }, process.env.JWT_SECRET, { expiresIn: '24h' });
+      // isAdmin derived server-side — never trust any flag from the client
+      const isAdmin = (email === (process.env.ADMIN_EMAIL || 'mohit.23bai10262@vitbhopal.ac.in').toLowerCase());
+      const sessionToken = jwt.sign({ email, isAdmin }, (process.env.JWT_SECRET || 'neohack-super-secret-key-2026') || 'neohack-super-secret-key-2026', { expiresIn: '24h' });
       res.cookie('session', sessionToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production'
