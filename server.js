@@ -392,13 +392,19 @@ app.post('/api/lookup', requireAuth, async (req, res) => {
       const placements = await Placement.find({ neoId: { $in: neoIds } }).lean();
       const placementMap = {};
       placements.forEach(p => {
-        if (p.neoId) placementMap[p.neoId.toUpperCase()] = p;
+        if (p.neoId) {
+          const key = p.neoId.toUpperCase();
+          if (!placementMap[key]) placementMap[key] = [];
+          if (!placementMap[key].includes(p.source)) {
+            placementMap[key].push(p.source);
+          }
+        }
       });
       
       allFoundStudents.forEach(student => {
         if (student.neoId && placementMap[student.neoId.toUpperCase()]) {
           student.isPlaced = true;
-          student.placementSource = placementMap[student.neoId.toUpperCase()].source;
+          student.placementSource = placementMap[student.neoId.toUpperCase()].join(', ');
         }
       });
     }
